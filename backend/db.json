@@ -82,24 +82,23 @@
   ],
   "receipts": [
     {
-      "doc_id": 100,
-      "item_code": "Т007",
-      "qty": 123,
+      "doc_id": 102,
+      "item_code": "Т001",
+      "qty": 1,
       "date": "2026-05-28"
-    }
-  ],
-  "issues": [
+    },
     {
-      "doc_id": 200,
-      "item_code": "Т007",
-      "qty": 123,
+      "doc_id": 103,
+      "item_code": "Т001",
+      "qty": 111,
       "date": "2026-05-28"
     }
   ],
+  "issues": [],
   "stockExpected": [
     {
       "item_code": "Т001",
-      "qty_expected": 0,
+      "qty_expected": 112,
       "date": "2026-05-28"
     },
     {
@@ -133,6 +132,6 @@
       "date": "2026-05-28"
     }
   ],
-  "nextDocIdReceipt": 101,
+  "nextDocIdReceipt": 104,
   "nextDocIdIssue": 201
 }
