@@ -1,0 +1,8 @@
+.tab-active { background-color: #3b82f6 !important; color: white !important; }
+.tab-inactive { background-color: #e2e8f0; color: #1e293b; }
+.tab-inactive:hover { background-color: #cbd5e1; }
+.scrollable-table { max-height: 500px; overflow-y: auto; display: block; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+thead tr { position: sticky; top: 0; background: #f8fafc; z-index: 10; }
+.modal-backdrop { background-color: rgba(0,0,0,0.5); }

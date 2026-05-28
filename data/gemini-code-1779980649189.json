@@ -1,0 +1,6 @@
+[
+  {"id": 1, "username": "admin", "password": "admin", "fullname": "Администратор", "role": "admin"},
+  {"id": 2, "username": "ivan", "password": "111", "fullname": "Иван Кладовщиков", "role": "storekeeper"},
+  {"id": 3, "username": "petrov", "password": "222", "fullname": "Пётр Менеджеров", "role": "manager"},
+  {"id": 4, "username": "sidorov", "password": "333", "fullname": "Сидор Аналитиков", "role": "analyst"}
+]

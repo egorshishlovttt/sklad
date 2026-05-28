@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Складской учёт | Приход, Расход, Инвентаризация, Отчёты</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        .tab-active { background-color: #3b82f6 !important; color: white !important; }
+        .tab-inactive { background-color: #e2e8f0; color: #1e293b; }
+        .tab-inactive:hover { background-color: #cbd5e1; }
+        .scrollable-table { max-height: 500px; overflow-y: auto; display: block; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+        thead tr { position: sticky; top: 0; background: #f8fafc; z-index: 10; }
+        .modal-backdrop { background-color: rgba(0,0,0,0.5); }
+    </style>
+</head>
+<body class="bg-slate-100 font-sans">
+
+<div id="authScreen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+        <div class="text-center mb-6">
+            <i class="fas fa-warehouse text-5xl text-blue-600"></i>
+            <h2 class="text-2xl font-bold mt-2">Складской учёт</h2>
+            <p class="text-gray-500">Вход / Регистрация</p>
+        </div>
+        <div class="flex gap-2 border-b mb-4">
+            <button id="loginTabBtn" class="px-4 py-2 text-blue-600 border-b-2 border-blue-600 font-medium">Вход</button>
+            <button id="registerTabBtn" class="px-4 py-2 text-gray-500">Регистрация</button>
+        </div>
+        <div id="loginForm">
+            <input type="text" id="loginUsername" placeholder="Логин" class="w-full p-2 border rounded mb-3">
+            <input type="password" id="loginPassword" placeholder="Пароль" class="w-full p-2 border rounded mb-3">
+            <button id="doLoginBtn" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Войти</button>
+            <div id="loginError" class="text-red-500 text-sm mt-2 hidden"></div>
+        </div>
+        <div id="registerForm" class="hidden">
+            <input type="text" id="regFullname" placeholder="ФИО" class="w-full p-2 border rounded mb-2">
+            <input type="text" id="regUsername" placeholder="Логин" class="w-full p-2 border rounded mb-2">
+            <input type="password" id="regPassword" placeholder="Пароль" class="w-full p-2 border rounded mb-2">
+            <select id="regRole" class="w-full p-2 border rounded mb-3">
+                <option value="storekeeper">Кладовщик</option>
+                <option value="manager">Менеджер склада</option>
+                <option value="analyst">Аналитик</option>
+            </select>
+            <button id="doRegisterBtn" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">Зарегистрироваться</button>
+            <div id="regError" class="text-red-500 text-sm mt-2 hidden"></div>
+        </div>
+        <div class="mt-4 text-xs text-gray-400 text-center">
+            Демо: admin/admin, ivan/111 (кладовщик), petrov/222 (менеджер), sidorov/333 (аналитик)
+        </div>
+    </div>
+</div>
+
+<div id="mainApp" class="max-w-7xl mx-auto px-4 py-6 hidden">
+    <div class="flex justify-between items-center mb-4 flex-wrap gap-3">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-bold text-slate-800"><i class="fas fa-warehouse text-blue-600 mr-2"></i>Складской учёт</h1>
+            <p class="text-slate-500 text-sm">Приход, расход, инвентаризация, отчёты</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="bg-white px-3 py-1 rounded-full shadow text-sm">
+                <i class="fas fa-user-circle mr-1"></i> <span id="currentUserDisplay"></span>
+                <span class="ml-2 px-2 py-0.5 bg-gray-200 rounded-full text-xs" id="roleDisplay"></span>
+            </div>
+            <button id="logoutBtn" class="bg-red-100 text-red-700 px-3 py-1 rounded-lg text-sm"><i class="fas fa-sign-out-alt"></i> Выйти</button>
+        </div>
+    </div>
+
+    <div id="tabsContainer" class="flex flex-wrap gap-2 border-b border-gray-200 pb-3 mb-6"></div>
+
+    <div id="itemsTab" class="tab-content hidden"></div>
+    <div id="receiptTab" class="tab-content hidden"></div>
+    <div id="issueTab" class="tab-content hidden"></div>
+    <div id="stockTab" class="tab-content hidden"></div>
+    <div id="inventoryTab" class="tab-content hidden"></div>
+    <div id="reportsTab" class="tab-content hidden"></div>
+    <div id="importTab" class="tab-content hidden"></div>
+    <div id="adminTab" class="tab-content hidden"></div>
+</div>
+
+<div id="movementModal" class="fixed inset-0 flex items-center justify-center z-50 hidden modal-backdrop">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative">
+        <h3 id="modalTitle" class="text-xl font-bold mb-4">Добавить приход</h3>
+        <select id="modalItemCode" class="w-full border rounded p-2 mb-3">
+            <option value="">Выберите товар</option>
+        </select>
+        <input type="number" id="modalQty" placeholder="Количество" class="w-full border rounded p-2 mb-3" step="1" min="1">
+        <input type="date" id="modalDate" class="w-full border rounded p-2 mb-4">
+        <div class="flex justify-end gap-2">
+            <button id="modalCancelBtn" class="px-4 py-2 bg-gray-300 rounded">Отмена</button>
+            <button id="modalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded">Добавить</button>
+        </div>
+    </div>
+</div>
+
+<div id="itemModal" class="fixed inset-0 flex items-center justify-center z-50 hidden modal-backdrop">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative">
+        <h3 class="text-xl font-bold mb-4">Добавить товар</h3>
+        <input type="text" id="itemCode" placeholder="Код товара (оставьте пустым для автогенерации)" class="w-full border rounded p-2 mb-3">
+        <input type="text" id="itemName" placeholder="Наименование" class="w-full border rounded p-2 mb-3">
+        <select id="itemUom" class="w-full border rounded p-2 mb-4">
+            <option value="шт">шт</option>
+            <option value="кг">кг</option>
+            <option value="м">м</option>
+            <option value="кор">кор</option>
+            <option value="л">л</option>
+        </select>
+        <div class="flex justify-end gap-2">
+            <button id="itemModalCancelBtn" class="px-4 py-2 bg-gray-300 rounded">Отмена</button>
+            <button id="itemModalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded">Добавить</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // --- МОДЕЛЬ ДАННЫХ ---
+        let items = [];
+        let receipts = [];
+        let issues = [];
+        let stockExpected = [];   
+        let users = [];
+        let currentUser = null;
+        let nextDocIdReceipt = 100;
+        let nextDocIdIssue = 200;
+        let activeTab = 'items';
+
+        const roleTabs = {
+            admin: ['items', 'receipt', 'issue', 'stock', 'inventory', 'reports', 'import', 'admin'],
+            manager: ['items', 'receipt', 'issue', 'stock', 'inventory', 'reports', 'import'],
+            storekeeper: ['items', 'receipt', 'issue', 'stock', 'reports'],
+            analyst: ['stock', 'reports']
+        };
+
+        function saveToLocal() {
+            localStorage.setItem('inv_items', JSON.stringify(items));
+            localStorage.setItem('inv_receipts', JSON.stringify(receipts));
+            localStorage.setItem('inv_issues', JSON.stringify(issues));
+            localStorage.setItem('inv_expected', JSON.stringify(stockExpected));
+            localStorage.setItem('inv_users', JSON.stringify(users));
+            localStorage.setItem('inv_counters', JSON.stringify({nextDocIdReceipt, nextDocIdIssue}));
+        }
+
+        function initDefaultUsers() {
+            users = [
+                {id: 1, username: 'admin', password: 'admin', fullname: 'Администратор', role: 'admin'},
+                {id: 2, username: 'ivan', password: '111', fullname: 'Иван Кладовщиков', role: 'storekeeper'},
+                {id: 3, username: 'petrov', password: '222', fullname: 'Пётр Менеджеров', role: 'manager'},
+                {id: 4, username: 'sidorov', password: '333', fullname: 'Сидор Аналитиков', role: 'analyst'}
+            ];
+            saveToLocal();
+        }
+
+        function generateDemoData() {
+            items = [
+                {item_code: "Т001", name: "Деталь X1", uom: "шт"},
+                {item_code: "Т002", name: "Деталь X2", uom: "шт"},
+                {item_code: "Т003", name: "Упаковка", uom: "кор"},
+                {item_code: "Т004", name: "Смазка", uom: "л"},
+                {item_code: "Т005", name: "Инструмент", uom: "шт"}
+            ];
+            receipts = [];
+            issues = [];
+            let docR = 100, docI = 200;
+            const startDate = new Date(2025,0,1);
+            for(let i=0; i<70; i++) {
+                let code = items[Math.floor(Math.random()*items.length)].item_code;
+                let qty = Math.floor(Math.random()*50)+5;
+                let date = new Date(startDate.getTime() + Math.random()*90*24*3600000).toISOString().slice(0,10);
+                receipts.push({doc_id: docR++, item_code: code, qty: qty, date: date});
+            }
+            for(let i=0; i<50; i++) {
+                let code = items[Math.floor(Math.random()*items.length)].item_code;
+                let qty = Math.floor(Math.random()*30)+1;
+                let date = new Date(startDate.getTime() + Math.random()*90*24*3600000).toISOString().slice(0,10);
+                issues.push({doc_id: docI++, item_code: code, qty: qty, date: date});
+            }
+            nextDocIdReceipt = docR;
+            nextDocIdIssue = docI;
+            stockExpected = [];
+            saveToLocal();
+        }
+
+        function loadFromLocal() {
+            const storedUsers = localStorage.getItem('inv_users');
+            if(storedUsers) {
+                users = JSON.parse(storedUsers);
+            }
+            if(!users || users.length === 0) {
+                initDefaultUsers();
+            }
+
+            const storedItems = localStorage.getItem('inv_items');
+            if(storedItems) items = JSON.parse(storedItems);
+            
+            const storedReceipts = localStorage.getItem('inv_receipts');
+            if(storedReceipts) receipts = JSON.parse(storedReceipts);
+            
+            const storedIssues = localStorage.getItem('inv_issues');
+            if(storedIssues) issues = JSON.parse(storedIssues);
+            
+            const storedExpected = localStorage.getItem('inv_expected');
+            if(storedExpected) stockExpected = JSON.parse(storedExpected);
+            
+            const storedCounters = localStorage.getItem('inv_counters');
+            if(storedCounters) {
+                let c = JSON.parse(storedCounters);
+                nextDocIdReceipt = c.nextDocIdReceipt || 100;
+                nextDocIdIssue = c.nextDocIdIssue || 200;
+            }
+            
+            if(items.length === 0) generateDemoData();
+        }
+
+        // Бизнес-логика
+        function getCalculatedStock(asOfDate = null) {
+            const targetDate = asOfDate || new Date().toISOString().slice(0,10);
+            const map = new Map();
+            receipts.forEach(r => { if(r.date <= targetDate) map.set(r.item_code, (map.get(r.item_code)||0) + r.qty); });
+            issues.forEach(i => { if(i.date <= targetDate) map.set(i.item_code, (map.get(i.item_code)||0) - i.qty); });
+            for(let [k,v] of map.entries()) if(v<0) map.set(k,0);
+            return map;
+        }
+
+        function getExpectedMap(asOfDate = null) {
+            const targetDate = asOfDate || new Date().toISOString().slice(0,10);
+            const filtered = stockExpected.filter(e => e.date <= targetDate);
+            const sorted = [...filtered].sort((a,b)=>new Date(b.date)-new Date(a.date));
+            const map = new Map();
+            sorted.forEach(e => { if(!map.has(e.item_code)) map.set(e.item_code, e.qty_expected); });
+            return map;
+        }
+
+        function getTotalReceipts(item_code, startDate, endDate) {
+            let sum = 0;
+            receipts.forEach(r => {
+                if(r.item_code === item_code && (!startDate || r.date >= startDate) && (!endDate || r.date <= endDate)) sum += r.qty;
+            });
+            return sum;
+        }
+
+        function getTotalIssues(item_code, startDate, endDate) {
+            let sum = 0;
+            issues.forEach(i => {
+                if(i.item_code === item_code && (!startDate || i.date >= startDate) && (!endDate || i.date <= endDate)) sum += i.qty;
+            });
+            return sum;
+        }
+
+        function canIssue(item_code, qty, date) {
+            const stock = getCalculatedStock(date);
+            return (stock.get(item_code)||0) >= qty;
+        }
+
+        function addReceipt(item_code, qty, date) {
+            receipts.push({doc_id: nextDocIdReceipt++, item_code, qty, date});
+            saveToLocal();
+        }
+
+        function addIssue(item_code, qty, date) {
+            if(!canIssue(item_code, qty, date)) { alert(`Недостаточно остатка для товара ${item_code}`); return false; }
+            issues.push({doc_id: nextDocIdIssue++, item_code, qty, date});
+            saveToLocal();
+            return true;
+        }
+
+        function generateNextItemCode() {
+            const prefix = "Т";
+            let maxNum = 0;
+            items.forEach(it => {
+                const match = it.item_code.match(/Т(\d+)/);
+                if(match) {
+                    const num = parseInt(match[1]);
+                    if(num > maxNum) maxNum = num;
+                }
+            });
+            const nextNum = maxNum + 1;
+            return prefix + String(nextNum).padStart(3, '0');
+        }
+
+        // --- UI РЕНДЕРИНГ ---
+        function renderTabs() {
+            const container = document.getElementById('tabsContainer');
+            if(!container) return;
+            const allowed = roleTabs[currentUser?.role] || ['items'];
+            const tabNames = {
+                items: '📦 Номенклатура',
+                receipt: '📥 Приход',
+                issue: '📤 Расход',
+                stock: '📊 Остатки',
+                inventory: '🔍 Инвентаризация',
+                reports: '📈 Отчёты',
+                import: '📂 Импорт CSV',
+                admin: '👑 Администрирование'
+            };
+            container.innerHTML = '';
+            allowed.forEach(tabId => {
+                const btn = document.createElement('button');
+                btn.className = `px-4 py-2 text-sm font-medium rounded-lg transition ${activeTab===tabId ? 'tab-active bg-blue-600 text-white' : 'tab-inactive bg-gray-200'}`;
+                btn.innerText = tabNames[tabId];
+                btn.onclick = () => switchTab(tabId);
+                container.appendChild(btn);
+            });
+        }
+
+        function switchTab(tabId) {
+            activeTab = tabId;
+            renderTabs();
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            const target = document.getElementById(tabId+'Tab');
+            if(target) target.classList.remove('hidden');
+            if(tabId === 'items') renderItems();
+            if(tabId === 'receipt') renderReceipts();
+            if(tabId === 'issue') renderIssues();
+            if(tabId === 'stock') renderStock();
+            if(tabId === 'inventory') renderInventory();
+            if(tabId === 'reports') renderReports();
+            if(tabId === 'import') renderImport();
+            if(tabId === 'admin') renderAdmin();
+        }
+
+        function renderItems() {
+            const container = document.getElementById('itemsTab');
+            if(!container) return;
+            const canEdit = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager');
+            container.innerHTML = `
+                <div class="bg-white rounded-xl shadow p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold">Товары</h2>
+                        ${canEdit ? '<button id="openAddItemModalBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg"><i class="fas fa-plus mr-1"></i>Добавить товар</button>' : ''}
+                    </div>
+                    <div class="scrollable-table border rounded">
+                        <table class="min-w-full">
+                            <thead class="bg-gray-50"><tr><th>Код</th><th>Наименование</th><th>Ед.изм</th><th></th></tr></thead>
+                            <tbody id="itemsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            const tbody = document.getElementById('itemsTableBody');
+            if(tbody) {
+                tbody.innerHTML = items.map(it => `
+                    <tr>
+                        <td>${it.item_code}</td>
+                        <td>${it.name}</td>
+                        <td>${it.uom}</td>
+                        <td>${canEdit ? `<button onclick="window.deleteItem('${it.item_code}')" class="text-red-500"><i class="fas fa-trash-alt"></i></button>` : '-'}</td>
+                    </tr>
+                `).join('');
+            }
+            const addBtn = document.getElementById('openAddItemModalBtn');
+            if(addBtn) addBtn.onclick = () => openItemModal();
+        }
+
+        function openItemModal() {
+            const generatedCode = generateNextItemCode();
+            document.getElementById('itemCode').value = generatedCode;
+            document.getElementById('itemName').value = '';
+            document.getElementById('itemUom').value = 'шт';
+            document.getElementById('itemModal').classList.remove('hidden');
+        }
+
+        function addNewItem() {
+            let code = document.getElementById('itemCode').value.trim();
+            const name = document.getElementById('itemName').value.trim();
+            const uom = document.getElementById('itemUom').value;
+            if(!name) { alert("Введите наименование товара"); return; }
+            if(!code) code = generateNextItemCode();
+            if(items.find(i=>i.item_code===code)) { alert("Код товара уже существует"); return; }
+            items.push({item_code: code, name: name, uom: uom});
+            saveToLocal();
+            renderItems();
+            document.getElementById('itemModal').classList.add('hidden');
+        }
+
+        window.deleteItem = (code) => {
+            if(confirm(`Удалить товар ${code}?`)) {
+                items = items.filter(i=>i.item_code!==code);
+                receipts = receipts.filter(r=>r.item_code!==code);
+                issues = issues.filter(i=>i.item_code!==code);
+                stockExpected = stockExpected.filter(e=>e.item_code!==code);
+                saveToLocal();
+                renderItems();
+                if(activeTab==='receipt') renderReceipts();
+                if(activeTab==='issue') renderIssues();
+                if(activeTab==='stock') renderStock();
+            }
+        };
+
+        function renderReceipts() {
+            const container = document.getElementById('receiptTab');
+            if(!container) return;
+            container.innerHTML = `
+                <div class="bg-white rounded-xl shadow p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold"><i class="fas fa-arrow-down text-green-600"></i> Документы прихода</h2>
+                        <button id="openReceiptModalBtn" class="bg-emerald-600 text-white px-4 py-2 rounded-lg"><i class="fas fa-plus mr-1"></i>Добавить приход</button>
+                    </div>
+                    <div class="scrollable-table border rounded">
+                        <table class="min-w-full"><thead><tr><th>№ док</th><th>Код товара</th><th>Наименование</th><th>Кол-во</th><th>Дата</th><th></th></tr></thead>
+                        <tbody id="receiptsBody"></tbody></table>
+                    </div>
+                </div>
+            `;
+            const tbody = document.getElementById('receiptsBody');
+            if(tbody) {
+                tbody.innerHTML = receipts.map(r => {
+                    const item = items.find(i=>i.item_code===r.item_code);
+                    return `
+                        <tr>
+                            <td>${r.doc_id}</td>
+                            <td>${r.item_code}</td>
+                            <td>${item ? item.name : '?'}</td>
+                            <td>${r.qty}</td>
+                            <td>${r.date}</td>
+                            <td>${(currentUser && (currentUser.role==='admin'||currentUser.role==='storekeeper')) ? `<button onclick="window.deleteReceipt(${r.doc_id})" class="text-red-500"><i class="fas fa-trash"></i></button>` : '-'}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+            document.getElementById('openReceiptModalBtn')?.addEventListener('click', () => openMovementModal('receipt'));
+        }
+
+        function renderIssues() {
+            const container = document.getElementById('issueTab');
+            if(!container) return;
+            container.innerHTML = `
+                <div class="bg-white rounded-xl shadow p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold"><i class="fas fa-arrow-up text-amber-600"></i> Документы расхода</h2>
+                        <button id="openIssueModalBtn" class="bg-orange-600 text-white px-4 py-2 rounded-lg"><i class="fas fa-plus mr-1"></i>Добавить расход</button>
+                    </div>
+                    <div class="scrollable-table border rounded">
+                        <table class="min-w-full"><thead><tr><th>№ док</th><th>Код товара</th><th>Наименование</th><th>Кол-во</th><th>Дата</th><th></th></tr></thead>
+                        <tbody id="issuesBody"></tbody></table>
+                    </div>
+                </div>
+            `;
+            const tbody = document.getElementById('issuesBody');
+            if(tbody) {
+                tbody.innerHTML = issues.map(i => {
+                    const item = items.find(it=>it.item_code===i.item_code);
+                    return `
+                        <tr>
+                            <td>${i.doc_id}</td>
+                            <td>${i.item_code}</td>
+                            <td>${item ? item.name : '?'}</td>
+                            <td>${i.qty}</td>
+                            <td>${i.date}</td>
+                            <td>${(currentUser && (currentUser.role==='admin'||currentUser.role==='storekeeper')) ? `<button onclick="window.deleteIssue(${i.doc_id})" class="text-red-500"><i class="fas fa-trash"></i></button>` : '-'}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+            document.getElementById('openIssueModalBtn')?.addEventListener('click', () => openMovementModal('issue'));
+        }
+
+        window.deleteReceipt = (id) => { receipts = receipts.filter(r=>r.doc_id!==id); saveToLocal(); renderReceipts(); if(activeTab==='stock') renderStock(); };
+        window.deleteIssue = (id) => { issues = issues.filter(i=>i.doc_id!==id); saveToLocal(); renderIssues(); if(activeTab==='stock') renderStock(); };
+
+        let currentModalType = null;
+        function openMovementModal(type) {
+            currentModalType = type;
+            document.getElementById('modalTitle').innerText = type === 'receipt' ? 'Добавить приход' : 'Добавить расход';
+            const select = document.getElementById('modalItemCode');
+            select.innerHTML = '<option value="">Выберите товар</option>' + items.map(it => `<option value="${it.item_code}">${it.item_code} - ${it.name}</option>`).join('');
+            document.getElementById('modalQty').value = '';
+            document.getElementById('modalDate').value = new Date().toISOString().slice(0,10);
+            document.getElementById('movementModal').classList.remove('hidden');
+        }
+
+        document.getElementById('modalConfirmBtn').onclick = () => {
+            const item_code = document.getElementById('modalItemCode').value;
+            const qty = parseInt(document.getElementById('modalQty').value);
+            const date = document.getElementById('modalDate').value;
+            if(!item_code || !qty || qty<=0 || !date) { alert("Заполните все поля"); return; }
+            if(currentModalType === 'receipt') {
+                addReceipt(item_code, qty, date);
+                renderReceipts();
+            } else {
+                if(addIssue(item_code, qty, date)) renderIssues();
+            }
+            if(activeTab === 'stock') renderStock();
+            document.getElementById('movementModal').classList.add('hidden');
+        };
+        document.getElementById('modalCancelBtn').onclick = () => document.getElementById('movementModal').classList.add('hidden');
+
+        function renderStock() {
+            const container = document.getElementById('stockTab');
+            if(!container) return;
+            const stockMap = getCalculatedStock();
+            const expMap = getExpectedMap();
+            container.innerHTML = `
+                <div class="bg-white rounded-xl shadow p-5">
+                    <h2 class="text-xl font-semibold mb-3"><i class="fas fa-cubes"></i> Текущие остатки и эталоны</h2>
+                    <div class="scrollable-table border rounded">
+                        <table class="min-w-full"><thead><tr><th>Код</th><th>Товар</th><th>Расчётный остаток</th><th>Эталон (инвентаризация)</th><th>Расхождение</th></tr></thead>
+                        <tbody id="stockTableBody"></tbody></table>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-3">* Эталон задаётся только через инвентаризацию.</p>
+                </div>
+            `;
+            const tbody = document.getElementById('stockTableBody');
+            if(tbody) {
+                tbody.innerHTML = items.map(it => {
+                    const calc = stockMap.get(it.item_code) || 0;
+                    const exp = expMap.get(it.item_code);
+                    const delta = exp !== undefined ? calc - exp : '—';
+                    return `<tr><td>${it.item_code}</td><td>${it.name}</td><td class="font-mono">${calc}</td>
+                             <td>${exp !== undefined ? exp : '—'}</td>
+                             <td class="${delta!=='—' && Math.abs(delta)>0 ? 'text-red-500' : ''}">${delta!=='—' ? delta : '—'}</td></tr>`;
+                }).join('');
+            }
+        }
+
+        function renderInventory() {
+            const container = document.getElementById('inventoryTab');
+            if(!container) return;
+            const expMap = getExpectedMap();
+            container.innerHTML = `
+                <div class="bg-white rounded-xl shadow p-5">
+                    <h2 class="text-xl font-semibold mb-3"><i class="fas fa-clipboard-list"></i> Скан-лист (фактические остатки)</h2>
+                    <div class="scrollable-table border rounded mb-4">
+                        <table class="min-w-full"><thead><tr><th>Код</th><th>Товар</th><th>Фактический остаток</th></tr></thead>
+                        <tbody id="scanlistBody"></tbody></table>
+                    </div>
+                    <div class="flex gap-3 mb-6">
+                        <button id="performInventoryBtn" class="bg-blue-600 text-white px-5 py-2 rounded-lg"><i class="fas fa-check-circle mr-1"></i> Провести инвентаризацию</button>
+                        <button id="exportInventoryProtocolBtn" class="bg-green-700 text-white px-5 py-2 rounded-lg"><i class="fas fa-file-csv"></i> Экспорт протокола</button>
+                    </div>
+                    <div id="inventoryResultArea" class="border-t pt-4">
+                        <h3 class="font-bold text-lg">Протокол расхождений</h3>
+                        <div id="inventoryProtocolContainer" class="scrollable-table mt-2"></div>
+                    </div>
+                </div>
+            `;
+            const tbody = document.getElementById('scanlistBody');
+            if(tbody) {
+                tbody.innerHTML = items.map(it => {
+                    const currentExp = expMap.get(it.item_code) !== undefined ? expMap.get(it.item_code) : 0;
+                    return `<tr><td>${it.item_code}</td><td>${it.name}</td><td><input type="number" id="scan_${it.item_code}" class="border rounded p-1 w-28" value="${currentExp}" step="1"></td></tr>`;
+                }).join('');
+            }
+            document.getElementById('performInventoryBtn')?.addEventListener('click', performInventory);
+            document.getElementById('exportInventoryProtocolBtn')?.addEventListener('click', exportInventoryProtocol);
+        }
+
+        function performInventory() {
+            const stockMap = getCalculatedStock();
+            const newExpectedMap = new Map();
+            items.forEach(it => {
+                const inp = document.getElementById(`scan_${it.item_code}`);
+                if(inp) newExpectedMap.set(it.item_code, parseFloat(inp.value) || 0);
+            });
+            const deviations = [];
+            for(let it of items) {
+                const calc = stockMap.get(it.item_code) || 0;
+                const fact = newExpectedMap.get(it.item_code) || 0;
+                if(calc !== fact) deviations.push({item_code: it.item_code, name: it.name, calculated: calc, actual: fact, diff: Math.abs(calc-fact)});
+            }
+            if(deviations.length === 0) {
+                alert("✅ Расхождений нет! Инвентаризация завершена, эталон обновлён.");
+            } else {
+                alert(`⚠️ Обнаружены расхождения по ${deviations.length} позициям. Протокол сформирован.`);
+            }
+            for(let it of items) {
+                const fact = newExpectedMap.get(it.item_code);
+                if(fact !== undefined) {
+                    stockExpected = stockExpected.filter(e => e.item_code !== it.item_code);
+                    stockExpected.push({item_code: it.item_code, qty_expected: fact, date: new Date().toISOString().slice(0,10)});
+                }
+            }
+            saveToLocal();
+            displayInventoryProtocol(deviations);
+            if(activeTab === 'stock') renderStock();
+        }
+
+        function displayInventoryProtocol(deviations) {
+            const container = document.getElementById('inventoryProtocolContainer');
+            if(!container) return;
+            if(deviations.length === 0) {
+                container.innerHTML = `<div class="p-3 bg-green-50 text-green-700 rounded">Нет расхождений. Все позиции соответствуют.</div>`;
+            } else {
+                let html = `<table class="min-w-full border"><thead><tr><th>Товар</th><th>Расчётный остаток</th><th>Фактический</th><th>|Расхождение|</th></tr></thead><tbody>`;
+                deviations.forEach(d => {
+                    html += `<tr><td>${d.item_code} (${d.name})</td><td>${d.calculated}</td><td>${d.actual}</td><td class="font-bold text-red-600">${d.diff}</td></tr>`;
+                });
+                html += `</tbody></table><p class="mt-2 text-sm">Всего расхождений: ${deviations.length}</p>`;
+                container.innerHTML = html;
+            }
+        }
+
+        function exportInventoryProtocol() {
+            const stockMap = getCalculatedStock();
+            const expMap = getExpectedMap();
+            const rows = [['Код товара','Наименование','Расчётный остаток','Эталон (факт)','|Расхождение|']];
+            items.forEach(it => {
+                const calc = stockMap.get(it.item_code) || 0;
+                const exp = expMap.get(it.item_code);
+                if(exp !== undefined && calc !== exp) {
+                    rows.push([it.item_code, it.name, calc, exp, Math.abs(calc-exp)]);
+                }
+            });
+            if(rows.length === 1) { alert("Нет расхождений для экспорта"); return; }
+            const csv = rows.map(r=>r.join(',')).join('\n');
+            const blob = new Blob([csv], {type:'text/csv'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `inventory_protocol_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+        }
+
+        function renderReports() {
+            const container = document.getElementById('reportsTab');
+            if(!container) return;
+            container.innerHTML = `
+                <div class="bg-white rounded-xl shadow p-5">
+                    <h2 class="text-xl font-bold mb-4">Отчёты по складу</h2>
+                    <div class="flex flex-wrap gap-3 items-end mb-6">
+                        <div><label class="block text-sm">Дата начала</label><input type="date" id="reportStart" class="border rounded p-2"></div>
+                        <div><label class="block text-sm">Дата окончания</label><input type="date" id="reportEnd" class="border rounded p-2"></div>
+                        <button id="applyReportBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Сформировать</button>
+                        <button id="fullReportBtn" class="bg-green-700 text-white px-4 py-2 rounded">Полный отчёт</button>
+                    </div>
+                    <div id="reportContent" class="mt-4"></div>
+                </div>
+            `;
+            const applyBtn = document.getElementById('applyReportBtn');
+            const fullBtn = document.getElementById('fullReportBtn');
+            if(applyBtn) applyBtn.onclick = () => generateReport(true);
+            if(fullBtn) fullBtn.onclick = () => generateReport(false);
+        }
+
+        function generateReport(usePeriod) {
+            let startDate = null, endDate = null;
+            if(usePeriod) {
+                startDate = document.getElementById('reportStart').value;
+                endDate = document.getElementById('reportEnd').value;
+                if(!endDate) { alert("Выберите дату окончания"); return; }
+            }
+            const targetDate = endDate || new Date().toISOString().slice(0,10);
+            const stockMap = getCalculatedStock(targetDate);
+            const expMap = getExpectedMap(targetDate);
+            
+            let totalItems = items.length;
+            let totalReceiptQty = 0, totalIssueQty = 0, totalCalculated = 0, totalExpected = 0, totalDelta = 0;
+            
+            const details = [];
+            for(let it of items) {
+                const receiptsSum = getTotalReceipts(it.item_code, startDate, endDate);
+                const issuesSum = getTotalIssues(it.item_code, startDate, endDate);
+                const currentStock = stockMap.get(it.item_code) || 0;
+                const expected = expMap.get(it.item_code);
+                const delta = expected !== undefined ? currentStock - expected : null;
+                
+                totalReceiptQty += receiptsSum;
+                totalIssueQty += issuesSum;
+                totalCalculated += currentStock;
+                if(expected !== undefined) {
+                    totalExpected += expected;
+                    if(delta !== null) totalDelta += delta;
+                }
+                
+                details.push({
+                    code: it.item_code, name: it.name, uom: it.uom,
+                    receiptsSum, issuesSum, currentStock,
+                    expected: expected !== undefined ? expected : '—',
+                    delta: delta !== null ? delta : '—'
+                });
+            }
+            
+            let html = `
+                <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                    <h3 class="text-lg font-bold mb-2">Краткая сводка</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                        <div><span class="font-semibold">Всего товаров:</span> ${totalItems}</div>
+                        <div><span class="font-semibold">Суммарный приход:</span> ${totalReceiptQty} ед.</div>
+                        <div><span class="font-semibold">Суммарный расход:</span> ${totalIssueQty} ед.</div>
+                        <div><span class="font-semibold">Суммарный расчётный остаток:</span> ${totalCalculated} ед.</div>
+                        <div><span class="font-semibold">Суммарный эталонный остаток:</span> ${totalExpected} ед.</div>
+                        <div><span class="font-semibold text-red-600">Общее расхождение:</span> ${totalDelta} ед.</div>
+                    </div>
+                </div>
+                <h3 class="text-lg font-bold mb-2">Детальная информация по товарам</h3>
+                <div class="scrollable-table border rounded">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-100">
+                            <tr><th>Код</th><th>Наименование</th><th>Ед.изм</th><th>Приход</th><th>Расход</th><th>Текущий остаток</th><th>Эталон</th><th>Дельта</th></tr>
+                        </thead>
+                        <tbody>
+                            ${details.map(d => `
+                                <tr>
+                                    <td>${d.code}</td><td>${d.name}</td><td>${d.uom}</td>
+                                    <td>${d.receiptsSum}</td><td>${d.issuesSum}</td><td>${d.currentStock}</td>
+                                    <td>${d.expected}</td><td class="${d.delta !== '—' && d.delta !== 0 ? 'text-red-500 font-semibold' : ''}">${d.delta}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+            document.getElementById('reportContent').innerHTML = html;
+        }
+
+        function renderImport() {
+            const container = document.getElementById('importTab');
+            if(!container) return;
+            container.innerHTML = `
+                <div class="bg-white rounded-xl shadow p-5">
+                    <h2 class="text-xl font-semibold mb-3">Импорт данных из CSV</h2>
+                    <div class="space-y-4">
+                        <div><label class="block font-medium">Приходы (item_code,qty,date)</label><input type="file" id="importReceiptsFile" accept=".csv" class="border p-1"></div>
+                        <div><label class="block font-medium">Расходы (item_code,qty,date)</label><input type="file" id="importIssuesFile" accept=".csv" class="border p-1"></div>
+                        <button id="doImportBtn" class="bg-indigo-600 text-white px-4 py-2 rounded">Загрузить и добавить</button>
+                    </div>
+                </div>`;
+            document.getElementById('doImportBtn')?.addEventListener('click', () => {
+                const receiptFile = document.getElementById('importReceiptsFile')?.files[0];
+                const issueFile = document.getElementById('importIssuesFile')?.files[0];
+                if(receiptFile) parseCSVFile(receiptFile, 'receipts');
+                if(issueFile) parseCSVFile(issueFile, 'issues');
+            });
+        }
+
+        function parseCSVFile(file, type) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const text = e.target.result;
+                const lines = text.split(/\r?\n/).slice(1);
+                let added = 0;
+                for(let line of lines) {
+                    if(!line.trim()) continue;
+                    const parts = line.split(',');
+                    if(parts.length < 3) continue;
+                    const item_code = parts[0].trim();
+                    const qty = parseFloat(parts[1]);
+                    const date = parts[2].trim();
+                    if(!items.find(i=>i.item_code===item_code)) continue;
+                    if(isNaN(qty) || !date) continue;
+                    if(type === 'receipts') addReceipt(item_code, qty, date);
+                    else if(type === 'issues') addIssue(item_code, qty, date);
+                    added++;
+                }
+                alert(`Импортировано записей: ${added}`);
+                if(activeTab === 'receipt') renderReceipts();
+                if(activeTab === 'issue') renderIssues();
+            };
+            reader.readAsText(file);
+        }
+
+        function renderAdmin() {
+            const container = document.getElementById('adminTab');
+            if(!container) return;
+            container.innerHTML = `
+                <div class="bg-white rounded-xl shadow p-5">
+                    <h2 class="text-xl font-bold mb-3">Управление пользователями</h2>
+                    <div class="scrollable-table border rounded">
+                        <table class="min-w-full"><thead><tr><th>ID</th><th>Логин</th><th>ФИО</th><th>Роль</th><th>Действия</th></tr></thead>
+                        <tbody id="adminUserList"></tbody></table>
+                    </div>
+                    <button id="createUserAdminBtn" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded">+ Создать пользователя</button>
+                </div>`;
+            const tbody = document.getElementById('adminUserList');
+            if(tbody) {
+                tbody.innerHTML = users.map(u => `
+                    <tr><td>${u.id}</td><td>${u.username}</td><td>${u.fullname}</td><td>${u.role}</td>
+                    <td><button onclick="window.adminDeleteUser(${u.id})" class="text-red-500"><i class="fas fa-trash"></i></button></td></tr>
+                `).join('');
+            }
+            document.getElementById('createUserAdminBtn')?.addEventListener('click', () => {
+                let uname = prompt("Логин"); if(!uname) return;
+                let pwd = prompt("Пароль");
+                let fname = prompt("ФИО");
+                let role = prompt("Роль (admin/manager/storekeeper/analyst)");
+                if(uname && pwd && role) {
+                    let newId = Math.max(...users.map(u=>u.id),0)+1;
+                    users.push({id:newId, username:uname, password:pwd, fullname:fname||uname, role});
+                    saveToLocal(); renderAdmin();
+                }
+            });
+        }
+
+        window.adminDeleteUser = (id) => {
+            if(id === currentUser.id){ alert("Нельзя удалить самого себя"); return; }
+            if(confirm("Удалить пользователя?")){ users = users.filter(u=>u.id!==id); saveToLocal(); renderAdmin(); }
+        };
+
+        function initMainApp() {
+            document.getElementById('currentUserDisplay').innerText = currentUser.fullname;
+            document.getElementById('roleDisplay').innerText = currentUser.role;
+            renderTabs();
+            switchTab(activeTab);
+        }
+
+        // --- НАВЕШИВАНИЕ ОБРАБОТЧИКОВ ---
+        document.getElementById('doLoginBtn')?.addEventListener('click', () => {
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            const user = users.find(u => u.username === username && u.password === password);
+            if(user) {
+                currentUser = user;
+                document.getElementById('authScreen').classList.add('hidden');
+                document.getElementById('mainApp').classList.remove('hidden');
+                initMainApp();
+            } else {
+                const errDiv = document.getElementById('loginError');
+                errDiv.innerText = 'Неверный логин или пароль';
+                errDiv.classList.remove('hidden');
+            }
+        });
+
+        document.getElementById('loginTabBtn')?.addEventListener('click', () => {
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('registerForm').classList.add('hidden');
+        });
+        document.getElementById('registerTabBtn')?.addEventListener('click', () => {
+            document.getElementById('registerForm').classList.remove('hidden');
+            document.getElementById('loginForm').classList.add('hidden');
+        });
+
+        document.getElementById('doRegisterBtn')?.addEventListener('click', () => {
+            const uname = document.getElementById('regUsername').value.trim();
+            const pwd = document.getElementById('regPassword').value.trim();
+            const fname = document.getElementById('regFullname').value.trim();
+            const role = document.getElementById('regRole').value;
+            if(!uname || !pwd) { alert("Заполните логин и пароль"); return; }
+            if(users.find(u=>u.username===uname)) { alert("Логин занят"); return; }
+            const newId = Math.max(...users.map(u=>u.id),0)+1;
+            users.push({id:newId, username:uname, password:pwd, fullname:fname||uname, role});
+            saveToLocal();
+            alert("Регистрация успешна! Теперь войдите.");
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('loginForm').classList.remove('hidden');
+        });
+
+        document.getElementById('logoutBtn')?.addEventListener('click', () => {
+            currentUser = null;
+            document.getElementById('authScreen').classList.remove('hidden');
+            document.getElementById('mainApp').classList.add('hidden');
+        });
+
+        document.getElementById('itemModalConfirmBtn')?.addEventListener('click', addNewItem);
+        document.getElementById('itemModalCancelBtn')?.addEventListener('click', () => {
+            document.getElementById('itemModal').classList.add('hidden');
+        });
+
+        // Первичный запуск базы данных
+        loadFromLocal();
+    });
+</script>
+</body>
+</html>
