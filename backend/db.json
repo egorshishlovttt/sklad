@@ -41,6 +41,20 @@
       "password": "$2a$08$mlKddmsF8kctJRCpvcpkd.XZ0uPmWxFAMlVI0oKvfMWRyG5HKGdsu",
       "fullname": "artem",
       "role": "admin"
+    },
+    {
+      "id": 7,
+      "username": "12345",
+      "password": "$2a$08$Ooi7zsNCWC7INNG4OejaJuCNwV7qOmdhcIk/yi/pb6yOgCvsNSy0e",
+      "fullname": "123",
+      "role": "storekeeper"
+    },
+    {
+      "id": 8,
+      "username": "test",
+      "password": "$2a$08$UNxINTeC95ztjeQOCSNYceqoNJPFmrgUpy43sYwP0mC0UM0TW0vsi",
+      "fullname": "test",
+      "role": "manager"
     }
   ],
   "items": [
@@ -98,7 +112,7 @@
   "stockExpected": [
     {
       "item_code": "Т001",
-      "qty_expected": 112,
+      "qty_expected": 100,
       "date": "2026-05-28"
     },
     {
