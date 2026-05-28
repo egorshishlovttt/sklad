@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Складской учёт | Полный функционал + API</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        .tab-active { background-color: #3b82f6 !important; color: white !important; }
+        .tab-inactive { background-color: #e2e8f0; color: #1e293b; }
+        .tab-inactive:hover { background-color: #cbd5e1; }
+        .scrollable-table { max-height: 500px; overflow-y: auto; display: block; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+        thead tr { position: sticky; top: 0; background: #f8fafc; z-index: 10; }
+        .modal-backdrop { background-color: rgba(0,0,0,0.5); }
+    </style>
+</head>
+<body class="bg-slate-100 font-sans">
+
+<div id="authScreen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+        <div class="text-center mb-6">
+            <i class="fas fa-warehouse text-5xl text-blue-600"></i>
+            <h2 class="text-2xl font-bold mt-2">Складской учёт</h2>
+            <p class="text-gray-500">Вход / Регистрация (Серверный режим)</p>
+        </div>
+        <div class="flex gap-2 border-b mb-4">
+            <button id="loginTabBtn" class="px-4 py-2 text-blue-600 border-b-2 border-blue-600 font-medium">Вход</button>
+            <button id="registerTabBtn" class="px-4 py-2 text-gray-500">Регистрация</button>
+        </div>
+        <div id="loginForm">
+            <input type="text" id="loginUsername" placeholder="Логин" class="w-full p-2 border rounded mb-3">
+            <input type="password" id="loginPassword" placeholder="Пароль" class="w-full p-2 border rounded mb-3">
+            <button id="doLoginBtn" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Войти</button>
+            <div id="loginError" class="text-red-500 text-sm mt-2 hidden"></div>
+        </div>
+        <div id="registerForm" class="hidden">
+            <input type="text" id="regFullname" placeholder="ФИО" class="w-full p-2 border rounded mb-2">
+            <input type="text" id="regUsername" placeholder="Логин" class="w-full p-2 border rounded mb-2">
+            <input type="password" id="regPassword" placeholder="Пароль" class="w-full p-2 border rounded mb-2">
+            <select id="regRole" class="w-full p-2 border rounded mb-3">
+                <option value="storekeeper">Кладовщик</option>
+                <option value="manager">Менеджер склада</option>
+                <option value="analyst">Аналитик</option>
+            </select>
+            <button id="doRegisterBtn" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">Зарегистрироваться</button>
+        </div>
+    </div>
+</div>
+
+<div id="mainApp" class="max-w-7xl mx-auto px-4 py-6 hidden">
+    <div class="flex justify-between items-center mb-4 flex-wrap gap-3">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-bold text-slate-800"><i class="fas fa-warehouse text-blue-600 mr-2"></i>Складской учёт</h1>
+            <p class="text-slate-500 text-sm">Приход, расход, инвентаризация, отчётычерез API</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="bg-white px-3 py-1 rounded-full shadow text-sm">
+                <i class="fas fa-user-circle mr-1"></i> <span id="currentUserDisplay"></span>
+                <span class="ml-2 px-2 py-0.5 bg-gray-200 rounded-full text-xs" id="roleDisplay"></span>
+            </div>
+            <button id="logoutBtn" class="bg-red-100 text-red-700 px-3 py-1 rounded-lg text-sm"><i class="fas fa-sign-out-alt"></i> Выйти</button>
+        </div>
+    </div>
+
+    <div id="tabsContainer" class="flex flex-wrap gap-2 border-b border-gray-200 pb-3 mb-6"></div>
+
+    <div id="itemsTab" class="tab-content hidden"></div>
+    <div id="receiptTab" class="tab-content hidden"></div>
+    <div id="issueTab" class="tab-content hidden"></div>
+    <div id="stockTab" class="tab-content hidden"></div>
+    <div id="inventoryTab" class="tab-content hidden"></div>
+    <div id="reportsTab" class="tab-content hidden"></div>
+    <div id="adminTab" class="tab-content hidden"></div>
+</div>
+
+<div id="movementModal" class="fixed inset-0 flex items-center justify-center z-50 hidden modal-backdrop">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative">
+        <h3 id="modalTitle" class="text-xl font-bold mb-4">Добавить операцию</h3>
+        <select id="modalItemCode" class="w-full border rounded p-2 mb-3">
+            <option value="">Выберите товар</option>
+        </select>
+        <input type="number" id="modalQty" placeholder="Количество" class="w-full border rounded p-2 mb-3" step="1" min="1">
+        <input type="date" id="modalDate" class="w-full border rounded p-2 mb-4">
+        <div class="flex justify-end gap-2">
+            <button id="modalCancelBtn" class="px-4 py-2 bg-gray-300 rounded">Отмена</button>
+            <button id="modalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded">Добавить</button>
+        </div>
+    </div>
+</div>
+
+<div id="itemModal" class="fixed inset-0 flex items-center justify-center z-50 hidden modal-backdrop">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative">
+        <h3 class="text-xl font-bold mb-4">Добавить товар</h3>
+        <input type="text" id="itemCode" placeholder="Код товара (пусто для автогенерации)" class="w-full border rounded p-2 mb-3">
+        <input type="text" id="itemName" placeholder="Наименование" class="w-full border rounded p-2 mb-3">
+        <select id="itemUom" class="w-full border rounded p-2 mb-4">
+            <option value="шт">шт</option>
+            <option value="кг">кг</option>
+            <option value="м">м</option>
+            <option value="кор">кор</option>
+            <option value="л">л</option>
+        </select>
+        <div class="flex justify-end gap-2">
+            <button id="itemModalCancelBtn" class="px-4 py-2 bg-gray-300 rounded">Отмена</button>
+            <button id="itemModalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded">Добавить</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const API_URL = 'http://localhost:5000/api';
+        let items = [], receipts = [], issues = [], stockExpected = [], adminUsers = [];
+        let currentUser = null, activeTab = 'items', currentModalType = '';
+
+        const roleTabs = {
+            admin: ['items', 'receipt', 'issue', 'stock', 'inventory', 'reports', 'admin'],
+            manager: ['items', 'receipt', 'issue', 'stock', 'inventory', 'reports'],
+            storekeeper: ['items', 'receipt', 'issue', 'stock', 'reports'],
+            analyst: ['stock', 'reports']
+        };
+
+        function getHeaders() {
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+            };
+        }
+
+        async function apiRequest(endpoint, method = 'GET', body = null) {
+            const config = { method, headers: getHeaders() };
+            if (body) config.body = JSON.stringify(body);
+            try {
+                const res = await fetch(`${API_URL}${endpoint}`, config);
+                if (res.status === 401 || res.status === 403) { logout(); return null; }
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Ошибка сервера');
+                return data;
+            } catch (err) {
+                alert(err.message);
+                return null;
+            }
+        }
+
+        async function loadAllData() {
+            const allowed = roleTabs[currentUser?.role] || [];
+            if (allowed.includes('items')) items = await apiRequest('/items') || [];
+            if (allowed.includes('receipt')) receipts = await apiRequest('/receipts') || [];
+            if (allowed.includes('issue')) issues = await apiRequest('/issues') || [];
+            if (allowed.includes('stock') || allowed.includes('inventory') || allowed.includes('reports')) stockExpected = await apiRequest('/inventory/expected') || [];
+            if (allowed.includes('admin')) adminUsers = await apiRequest('/admin/users') || [];
+        }
+
+        // --- БИЗНЕС-ЛОГИКА НА КЛИЕНТЕ ---
+        function getCalculatedStock(asOfDate = null) {
+            const targetDate = asOfDate || new Date().toISOString().slice(0,10);
+            const map = new Map();
+            receipts.forEach(r => { if(r.date <= targetDate) map.set(r.item_code, (map.get(r.item_code)||0) + r.qty); });
+            issues.forEach(i => { if(i.date <= targetDate) map.set(i.item_code, (map.get(i.item_code)||0) - i.qty); });
+            for(let [k,v] of map.entries()) if(v<0) map.set(k,0);
+            return map;
+        }
+
+        function getExpectedMap(asOfDate = null) {
+            const targetDate = asOfDate || new Date().toISOString().slice(0,10);
+            const map = new Map();
+            const sorted = [...stockExpected].filter(e => e.date <= targetDate).sort((a,b)=>new Date(b.date)-new Date(a.date));
+            sorted.forEach(e => { if(!map.has(e.item_code)) map.set(e.item_code, e.qty_expected); });
+            return map;
+        }
+
+        function getTotalReceipts(item_code, startDate, endDate) {
+            let sum = 0;
+            receipts.forEach(r => {
+                if(r.item_code === item_code && (!startDate || r.date >= startDate) && (!endDate || r.date <= endDate)) sum += r.qty;
+            });
+            return sum;
+        }
+
+        function getTotalIssues(item_code, startDate, endDate) {
+            let sum = 0;
+            issues.forEach(i => {
+                if(i.item_code === item_code && (!startDate || i.date >= startDate) && (!endDate || i.date <= endDate)) sum += i.qty;
+            });
+            return sum;
+        }
+
+        function generateNextItemCode() {
+            const prefix = "Т";
+            let maxNum = 0;
+            items.forEach(it => {
+                const match = it.item_code.match(/Т(\d+)/);
+                if(match) {
+                    const num = parseInt(match[1]);
+                    if(num > maxNum) maxNum = num;
+                }
+            });
+            return prefix + String(maxNum + 1).padStart(3, '0');
+        }
+
+        // --- РЕНДЕРИНГ ИНТЕРФЕЙСА ---
+        function renderTabs() {
+            const container = document.getElementById('tabsContainer');
+            const allowed = roleTabs[currentUser?.role] || ['items'];
+            const names = { items: '📦 Номенклатура', receipt: '📥 Приход', issue: '📤 Расход', stock: '📊 Остатки', inventory: '🔍 Инвентаризация', reports: '📈 Отчёты', admin: '👑 Администрирование' };
+            container.innerHTML = '';
+            allowed.forEach(tabId => {
+                const btn = document.createElement('button');
+                btn.className = `px-4 py-2 text-sm font-medium rounded-lg transition ${activeTab===tabId ? 'tab-active bg-blue-600 text-white' : 'tab-inactive bg-gray-200'}`;
+                btn.innerText = names[tabId];
+                btn.onclick = () => switchTab(tabId);
+                container.appendChild(btn);
+            });
+        }
+
+        async function switchTab(tabId) {
+            activeTab = tabId;
+            renderTabs();
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(tabId+'Tab')?.classList.remove('hidden');
+            
+            await loadAllData();
+            
+            if(tabId === 'items') renderItems();
+            if(tabId === 'receipt') renderReceipts();
+            if(tabId === 'issue') renderIssues();
+            if(tabId === 'stock') renderStock();
+            if(tabId === 'inventory') renderInventory();
+            if(tabId === 'reports') renderReports();
+            if(tabId === 'admin') renderAdmin();
+        }
+
+        function renderItems() {
+            const canEdit = currentUser.role === 'admin' || currentUser.role === 'manager';
+            const container = document.getElementById('itemsTab');
+            container.innerHTML = `
+                <div class="bg-white rounded-xl shadow p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold">Товары</h2>
+                        ${canEdit ? '<button id="openAddItemModalBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg"><i class="fas fa-plus mr-1"></i>Добавить товар</button>' : ''}
+                    </div>
+                    <div class="scrollable-table border rounded">
+                        <table>
+                            <thead class="bg-gray-50"><tr><th>Код</th><th>Наименование</th><th>Ед.изм</th><th></th></tr></thead>
+                            <tbody>${items.map(it => `<tr><td>${it.item_code}</td><td>${it.name}</td><td>${it.uom}</td><td>${canEdit ? `<button onclick="window.deleteItem('${it.item_code}')" class="text-red-500"><i class="fas fa-trash-alt"></i></button>` : '-'}</td></tr>`).join('')}</tbody>
+                        </table>
+                    </div>
+                </div>`;
+            if(canEdit) {
+                document.getElementById('openAddItemModalBtn').onclick = () => {
+                    document.getElementById('itemCode').value = generateNextItemCode();
+                    document.getElementById('itemName').value = '';
+                    document.getElementById('itemUom').value = 'шт';
+                    document.getElementById('itemModal').classList.remove('hidden');
+                };
+            }
+        }
+
+        window.deleteItem = async (code) => {
+            if(confirm(`Удалить товар ${code} и связанные с ним документы?`)) {
+                await apiRequest(`/items/${code}`, 'DELETE');
+                switchTab('items');
+            }
+        };
+
+        document.getElementById('itemModalConfirmBtn').onclick = async () => {
+            let item_code = document.getElementById('itemCode').value.trim();
+            const name = document.getElementById('itemName').value.trim();
+            const uom = document.getElementById('itemUom').value;
+            if(!name) return alert('Введите наименование товара');
+            if(!item_code) item_code = generateNextItemCode();
+            
+            const res = await apiRequest('/items', 'POST', { item_code, name, uom });
+            if(res) { document.getElementById('itemModal').classList.add('hidden'); switchTab('items'); }
+        };
+
+        function renderReceipts() {
+            const container = document.getElementById('receiptTab');
+            container.innerHTML = `
+                <div class="bg-white rounded-xl shadow p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold"><i class="fas fa-arrow-down text-green-600"></i> Документы прихода</h2>
+                        <button id="openReceiptModalBtn" class="bg-emerald-600 text-white px-4 py-2 rounded-lg"><i class="fas fa-plus mr-1"></i>Добавить приход</button>
+                    </div>
+                    <div class="scrollable-table border rounded">
+                        <table><thead><tr><th>№ док</th><th>Код товара</th><th>Наименование</th><th>Кол-во</th><th>Дата</th><th></th></tr></thead>
+                        <tbody>${receipts.map(r => {
+                            const item = items.find(i=>i.item_code===r.item_code);
+                            return `<tr><td>${r.doc_id}</td><td>${r.item_code}</td><td>${item ? item.name : '?'}</td><td>${r.qty}</td><td>${r.date}</td><td><button onclick="window.delDoc('receipts', ${r.doc_id})" class="text-red-500"><i class="fas fa-trash"></i></button></td></tr>`;
+                        }).join('')}</tbody></table>
+                    </div>
+                </div>`;
+            document.getElementById('openReceiptModalBtn').onclick = () => openMovementModal('receipt');
+        }
+
+        function renderIssues() {
+            const container = document.getElementById('issueTab');
+            container.innerHTML = `
+                <div class="bg-white rounded-xl shadow p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold"><i class="fas fa-arrow-up text-amber-600"></i> Документы расхода</h2>
+                        <button id="openIssueModalBtn" class="bg-orange-600 text-white px-4 py-2 rounded-lg"><i class="fas fa-plus mr-1"></i>Добавить расход</button>
+                    </div>
+                    <div class="scrollable-table border rounded">
+                        <table><thead><tr><th>№ док</th><th>Код товара</th><th>Наименование</th><th>Кол-во</th><th>Дата</th><th></th></tr></thead>
+                        <tbody>${issues.map(i => {
+                            const item = items.find(it=>it.item_code===i.item_code);
+                            return `<tr><td>${i.doc_id}</td><td>${i.item_code}</td><td>${item ? item.name : '?'}</td><td>${i.qty}</td><td>${i.date}</td><td><button onclick="window.delDoc('issues', ${i.doc_id})" class="text-red-500"><i class="fas fa-trash"></i></button></td></tr>`;
+                        }).join('')}</tbody></table>
+                    </div>
+                </div>`;
+            document.getElementById('openIssueModalBtn').onclick = () => openMovementModal('issue');
+        }
+
+        window.delDoc = async (type, id) => {
+            if(confirm('Удалить этот документ?')) { 
+                await apiRequest(`/${type}/${id}`, 'DELETE'); 
+                switchTab(type === 'receipts' ? 'receipt' : 'issue'); 
+            }
+        };
+
+        function openMovementModal(type) {
+            currentModalType = type;
+            document.getElementById('modalTitle').innerText = type === 'receipt' ? 'Добавить приход' : 'Добавить расход';
+            document.getElementById('modalItemCode').innerHTML = '<option value="">Выберите товар</option>' + items.map(i => `<option value="${i.item_code}">${i.item_code} - ${i.name}</option>`).join('');
+            document.getElementById('modalQty').value = '';
+            document.getElementById('modalDate').value = new Date().toISOString().slice(0,10);
+            document.getElementById('movementModal').classList.remove('hidden');
+        }
+
+        document.getElementById('modalConfirmBtn').onclick = async () => {
+            const item_code = document.getElementById('modalItemCode').value;
+            const qty = parseInt(document.getElementById('modalQty').value);
+            const date = document.getElementById('modalDate').value;
+            if(!item_code || !qty || qty<=0 || !date) return alert('Заполните все поля корректно');
+            
+            const res = await apiRequest(currentModalType === 'receipt' ? '/receipts' : '/issues', 'POST', { item_code, qty, date });
+            if(res) { document.getElementById('movementModal').classList.add('hidden'); switchTab(currentModalType); }
+        };
+
+        function renderStock() {
+            const stockMap = getCalculatedStock();
+            const expMap = getExpectedMap();
+            document.getElementById('stockTab').innerHTML = `
+                <div class="bg-white rounded-xl shadow p-5">
+                    <h2 class="text-xl font-semibold mb-3"><i class="fas fa-cubes"></i> Текущие остатки и эталоны</h2>
+                    <div class="scrollable-table border rounded">
+                        <table><thead><tr><th>Код</th><th>Товар</th><th>Расчётный остаток</th><th>Эталон (инвентаризация)</th><th>Расхождение</th></tr></thead>
+                        <tbody>${items.map(it => {
+                            const calc = stockMap.get(it.item_code) || 0; 
+                            const exp = expMap.get(it.item_code); 
+                            const delta = exp !== undefined ? calc - exp : '—';
+                            return `<tr><td>${it.item_code}</td><td>${it.name}</td><td class="font-mono">${calc}</td><td>${exp!==undefined?exp:'—'}</td><td class="${delta!=='—' && Math.abs(delta)>0?'text-red-500 font-bold':''}">${delta}</td></tr>`;
+                        }).join('')}</tbody></table>
+                    </div>
+                </div>`;
+        }
+
+        function renderInventory() {
+            const expMap = getExpectedMap();
+            document.getElementById('inventoryTab').innerHTML = `
+                <div class="bg-white rounded-xl shadow p-5">
+                    <h2 class="text-xl font-semibold mb-3"><i class="fas fa-clipboard-list"></i> Скан-лист (фактические остатки)</h2>
+                    <div class="scrollable-table border rounded mb-4">
+                        <table><thead><tr><th>Код</th><th>Товар</th><th>Фактический остаток</th></tr></thead>
+                        <tbody>${items.map(it => `<tr><td>${it.item_code}</td><td>${it.name}</td><td><input type="number" id="scan_${it.item_code}" class="border rounded p-1 w-28 text-center" value="${expMap.get(it.item_code) !== undefined ? expMap.get(it.item_code) : 0}"></td></tr>`).join('')}</tbody></table>
+                    </div>
+                    <div class="flex gap-3 mb-6">
+                        <button id="performInventoryBtn" class="bg-blue-600 text-white px-5 py-2 rounded-lg"><i class="fas fa-check-circle mr-1"></i> Провести инвентаризацию</button>
+                        <button id="exportInventoryProtocolBtn" class="bg-green-700 text-white px-5 py-2 rounded-lg"><i class="fas fa-file-csv"></i> Экспорт протокола</button>
+                    </div>
+                    <div class="border-t pt-4">
+                        <h3 class="font-bold text-lg">Протокол расхождений</h3>
+                        <div id="inventoryProtocolContainer" class="scrollable-table mt-2"></div>
+                    </div>
+                </div>`;
+            document.getElementById('performInventoryBtn').onclick = performInventory;
+            document.getElementById('exportInventoryProtocolBtn').onclick = exportInventoryProtocol;
+            displayInventoryProtocol([]); // Сброс протокола по умолчанию
+        }
+
+        async function performInventory() {
+            const stockMap = getCalculatedStock();
+            const newExpected = items.map(it => ({
+                item_code: it.item_code,
+                qty_expected: parseFloat(document.getElementById(`scan_${it.item_code}`).value) || 0,
+                date: new Date().toISOString().slice(0,10)
+            }));
+
+            const res = await apiRequest('/inventory/perform', 'POST', { newExpected });
+            if(res) {
+                stockExpected = await apiRequest('/inventory/expected') || [];
+                const deviations = [];
+                items.forEach(it => {
+                    const calc = stockMap.get(it.item_code) || 0;
+                    const fact = newExpected.find(e => e.item_code === it.item_code).qty_expected;
+                    if(calc !== fact) deviations.push({ item_code: it.item_code, name: it.name, calculated: calc, actual: fact, diff: Math.abs(calc - fact) });
+                });
+                alert(deviations.length === 0 ? "✅ Расхождений нет! Эталон успешно синхронизирован." : `⚠️ Найдено ${deviations.length} расхождений.`);
+                displayInventoryProtocol(deviations);
+            }
+        }
+
+        function displayInventoryProtocol(deviations) {
+            const container = document.getElementById('inventoryProtocolContainer');
+            if(!container) return;
+            if(deviations.length === 0) {
+                container.innerHTML = `<div class="p-3 bg-green-50 text-green-700 rounded">Расхождений не зафиксировано или нажмите "Провести", чтобы рассчитать дельту.</div>`;
+            } else {
+                container.innerHTML = `
+                    <table class="min-w-full border text-sm">
+                        <thead class="bg-red-50"><tr><th>Товар</th><th>Остаток расчетный</th><th>Фактический (Ввод)</th><th>Разница</th></tr></thead>
+                        <tbody>${deviations.map(d => `<tr><td>${d.item_code} (${d.name})</td><td>${d.calculated}</td><td>${d.actual}</td><td class="font-bold text-red-600">${d.diff}</td></tr>`).join('')}</tbody>
+                    </table>`;
+            }
+        }
+
+        function exportInventoryProtocol() {
+            const stockMap = getCalculatedStock();
+            const expMap = getExpectedMap();
+            const rows = [['Код товара','Наименование','Расчётный остаток','Эталон (факт)','Разница']];
+            items.forEach(it => {
+                const calc = stockMap.get(it.item_code) || 0;
+                const exp = expMap.get(it.item_code);
+                if(exp !== undefined && calc !== exp) rows.push([it.item_code, it.name, calc, exp, Math.abs(calc-exp)]);
+            });
+            if(rows.length === 1) return alert("Нет отклонений для создания отчета CSV.");
+            const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `protocol_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function renderReports() {
+            document.getElementById('reportsTab').innerHTML = `
+                <div class="bg-white rounded-xl shadow p-5">
+                    <h2 class="text-xl font-bold mb-4">Отчёты по складу</h2>
+                    <div class="flex flex-wrap gap-3 items-end mb-6">
+                        <div><label class="block text-sm">Дата начала</label><input type="date" id="reportStart" class="border rounded p-2"></div>
+                        <div><label class="block text-sm">Дата окончания</label><input type="date" id="reportEnd" class="border rounded p-2"></div>
+                        <button id="applyReportBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Сформировать за период</button>
+                        <button id="fullReportBtn" class="bg-green-700 text-white px-4 py-2 rounded">Полный отчёт</button>
+                    </div>
+                    <div id="reportContent" class="mt-4"></div>
+                </div>`;
+            document.getElementById('applyReportBtn').onclick = () => generateReport(true);
+            document.getElementById('fullReportBtn').onclick = () => generateReport(false);
+        }
+
+        function generateReport(usePeriod) {
+            let startDate = null, endDate = null;
+            if(usePeriod) {
+                startDate = document.getElementById('reportStart').value;
+                endDate = document.getElementById('reportEnd').value;
+                if(!endDate) return alert("Укажите конечную дату");
+            }
+            const targetDate = endDate || new Date().toISOString().slice(0,10);
+            const stockMap = getCalculatedStock(targetDate);
+            const expMap = getExpectedMap(targetDate);
+            
+            let totalReceiptQty = 0, totalIssueQty = 0, totalCalculated = 0, totalExpected = 0;
+            const details = [];
+
+            items.forEach(it => {
+                const receiptsSum = getTotalReceipts(it.item_code, startDate, endDate);
+                const issuesSum = getTotalIssues(it.item_code, startDate, endDate);
+                const currentStock = stockMap.get(it.item_code) || 0;
+                const expected = expMap.get(it.item_code);
+                const delta = expected !== undefined ? currentStock - expected : null;
+                
+                totalReceiptQty += receiptsSum; totalIssueQty += issuesSum; totalCalculated += currentStock;
+                if(expected !== undefined) totalExpected += expected;
+                
+                details.push({ code: it.item_code, name: it.name, uom: it.uom, receiptsSum, issuesSum, currentStock, expected: expected !== undefined ? expected : '—', delta: delta !== null ? delta : '—' });
+            });
+
+            document.getElementById('reportContent').innerHTML = `
+                <div class="bg-gray-50 p-4 rounded-lg mb-6 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    <div><span class="font-semibold">Всего видов товаров:</span> ${items.length}</div>
+                    <div><span class="font-semibold">Приход за период:</span> ${totalReceiptQty} ед.</div>
+                    <div><span class="font-semibold">Расход за период:</span> ${totalIssueQty} ед.</div>
+                    <div><span class="font-semibold">Остаток на складе:</span> ${totalCalculated} ед.</div>
+                </div>
+                <div class="scrollable-table border rounded">
+                    <table>
+                        <thead class="bg-gray-100"><tr><th>Код</th><th>Наименование</th><th>Ед.изм</th><th>Приход</th><th>Расход</th><th>Тек.Остаток</th><th>Эталон</th><th>Дельта</th></tr></thead>
+                        <tbody>${details.map(d => `<tr><td>${d.code}</td><td>${d.name}</td><td>${d.uom}</td><td>${d.receiptsSum}</td><td>${d.issuesSum}</td><td>${d.currentStock}</td><td>${d.expected}</td><td class="${d.delta!=='—'&&d.delta!==0?'text-red-500 font-bold':''}">${d.delta}</td></tr>`).join('')}</tbody>
+                    </table>
+                </div>`;
+        }
+
+        function renderAdmin() {
+            document.getElementById('adminTab').innerHTML = `
+                <div class="bg-white rounded-xl shadow p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold">Управление пользователями (Серверное)</h2>
+                        <button id="createUserAdminBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg">+ Новый пользователь</button>
+                    </div>
+                    <div class="scrollable-table border rounded">
+                        <table><thead><tr><th>ID</th><th>Логин</th><th>ФИО</th><th>Роль</th><th></th></tr></thead>
+                        <tbody>${adminUsers.map(u => `<tr><td>${u.id}</td><td>${u.username}</td><td>${u.fullname}</td><td>${u.role}</td><td><button onclick="window.delUser(${u.id})" class="text-red-500"><i class="fas fa-trash"></i></button></td></tr>`).join('')}</tbody></table>
+                    </div>
+                </div>`;
+            document.getElementById('createUserAdminBtn').onclick = async () => {
+                const username = prompt("Введите логин:"); if(!username) return;
+                const password = prompt("Введите пароль:"); if(!password) return;
+                const fullname = prompt("Введите ФИО:");
+                const role = prompt("Введите роль (admin / manager / storekeeper / analyst):");
+                const res = await apiRequest('/admin/users', 'POST', { username, password, fullname, role });
+                if(res) switchTab('admin');
+            };
+        }
+
+        window.delUser = async (id) => {
+            if(id === currentUser.id) return alert("Нельзя удалить себя");
+            if(confirm('Удалить пользователя?')) { await apiRequest(`/admin/users/${id}`, 'DELETE'); switchTab('admin'); }
+        };
+
+        // --- ВХОД / ВЫХОД ---
+        document.getElementById('doLoginBtn').onclick = async () => {
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            try {
+                const res = await fetch(`${API_URL}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+                const data = await res.json();
+                if(!res.ok) throw new Error(data.message);
+                
+                sessionStorage.setItem('token', data.token);
+                currentUser = data.user;
+                
+                document.getElementById('authScreen').classList.add('hidden');
+                document.getElementById('mainApp').classList.remove('hidden');
+                document.getElementById('currentUserDisplay').innerText = currentUser.fullname;
+                document.getElementById('roleDisplay').innerText = currentUser.role;
+                switchTab('items');
+            } catch(e) { alert(e.message); }
+        };
+
+        document.getElementById('doRegisterBtn').onclick = async () => {
+            const username = document.getElementById('regUsername').value.trim();
+            const password = document.getElementById('regPassword').value.trim();
+            const fullname = document.getElementById('regFullname').value.trim();
+            const role = document.getElementById('regRole').value;
+            const res = await fetch(`${API_URL}/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password, fullname, role }) });
+            if(res.ok) { alert('Регистрация завершена! Войдите в систему.'); document.getElementById('loginForm').classList.remove('hidden'); document.getElementById('registerForm').classList.add('hidden'); }
+            else { const d = await res.json(); alert(d.message); }
+        };
+
+        function logout() {
+            sessionStorage.removeItem('token'); currentUser = null;
+            document.getElementById('authScreen').classList.remove('hidden');
+            document.getElementById('mainApp').classList.add('hidden');
+        }
+
+        document.getElementById('logoutBtn').onclick = logout;
+        document.getElementById('loginTabBtn').onclick = () => { document.getElementById('loginForm').classList.remove('hidden'); document.getElementById('registerForm').classList.add('hidden'); };
+        document.getElementById('registerTabBtn').onclick = () => { document.getElementById('registerForm').classList.remove('hidden'); document.getElementById('loginForm').classList.add('hidden'); };
+        document.getElementById('modalCancelBtn').onclick = () => document.getElementById('movementModal').classList.add('hidden');
+        document.getElementById('itemModalCancelBtn').onclick = () => document.getElementById('itemModal').classList.add('hidden');
+    });
+</script>
+</body>
+</html>
