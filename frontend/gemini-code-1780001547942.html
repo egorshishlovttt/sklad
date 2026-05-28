@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Складской учёт | Инвентаризация и API</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-50 font-sans antialiased text-slate-900">
+
+<div id="authScreen" class="min-h-screen flex items-center justify-center bg-gradient-to-tr from-slate-100 via-blue-50 to-indigo-100 p-4">
+    <div class="bg-white rounded-3xl shadow-2xl p-10 w-full max-w-md border border-white/60 transform transition-all">
+        <div class="text-center mb-8">
+            <div class="inline-flex p-4 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-600/20 mb-3">
+                <i class="fas fa-warehouse text-4xl"></i>
+            </div>
+            <h2 class="text-3xl font-black tracking-tight text-slate-800">Складской учёт</h2>
+            <p class="text-slate-400 text-sm mt-1">Авторизация в системе управления</p>
+        </div>
+        <div id="loginForm" class="space-y-4">
+            <input type="text" id="loginUsername" placeholder="Логин" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition shadow-inner">
+            <input type="password" id="loginPassword" placeholder="Пароль" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition shadow-inner">
+            <button id="doLoginBtn" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-blue-600/30 hover:bg-blue-700 hover:shadow-blue-700/40 transition transform active:scale-[0.98]">Войти в систему</button>
+        </div>
+    </div>
+</div>
+
+<div id="mainApp" class="max-w-7xl mx-auto px-4 py-8 hidden">
+    <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-6 flex justify-between items-center mb-6 flex-wrap gap-4 shadow-slate-100">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-black text-slate-800 tracking-tight"><i class="fas fa-warehouse text-blue-600 mr-2"></i>Складской учёт</h1>
+            <p class="text-slate-400 text-sm mt-0.5">Учет движения, инвентаризация и аналитика</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="bg-slate-50 border border-slate-100 px-4 py-2 rounded-xl shadow-inner text-sm font-medium flex items-center gap-2">
+                <i class="fas fa-user-circle text-slate-400 text-lg"></i> 
+                <span id="currentUserDisplay" class="text-slate-700"></span>
+                <span class="px-2 py-0.5 bg-blue-50 border border-blue-100 text-blue-700 font-bold rounded-md text-xs uppercase" id="roleDisplay"></span>
+            </div>
+            <button id="logoutBtn" class="bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-700 px-4 py-2 rounded-xl text-sm font-semibold transition active:scale-95"><i class="fas fa-sign-out-alt mr-1"></i> Выйти</button>
+        </div>
+    </div>
+
+    <div id="tabsContainer" class="flex flex-wrap gap-2 pb-3 mb-6"></div>
+
+    <div id="itemsTab" class="tab-content hidden space-y-6"></div>
+    <div id="receiptTab" class="tab-content hidden space-y-6"></div>
+    <div id="issueTab" class="tab-content hidden space-y-6"></div>
+    <div id="stockTab" class="tab-content hidden space-y-6"></div>
+    <div id="inventoryTab" class="tab-content hidden space-y-6"></div>
+    <div id="reportsTab" class="tab-content hidden space-y-6"></div>
+    <div id="adminTab" class="tab-content hidden space-y-6"></div>
+</div>
+
+<div id="movementModal" class="fixed inset-0 flex items-center justify-center z-50 hidden modal-backdrop">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative border border-slate-100">
+        <h3 id="modalTitle" class="text-xl font-bold mb-4 text-slate-800">Добавить операцию</h3>
+        <div class="space-y-3">
+            <select id="modalItemCode" class="w-full border rounded-xl p-3 bg-white outline-none focus:ring-2 focus:ring-blue-500"></select>
+            <input type="number" id="modalQty" placeholder="Количество" class="w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500" step="1" min="1">
+            <div class="bg-slate-50 border border-slate-200/60 rounded-xl p-3 text-xs text-slate-500 flex justify-between items-center">
+                <span>Время проводки:</span>
+                <span id="modalCurrentTimeLabel" class="font-bold text-slate-700 font-mono"></span>
+            </div>
+        </div>
+        <div class="flex justify-end gap-2 mt-5">
+            <button id="modalCancelBtn" class="px-4 py-2 bg-slate-100 rounded-xl font-medium text-slate-600 hover:bg-slate-200 transition">Отмена</button>
+            <button id="modalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded-xl font-medium shadow-md shadow-blue-600/20 hover:bg-blue-700 transition">Добавить</button>
+        </div>
+    </div>
+</div>
+
+<div id="itemModal" class="fixed inset-0 flex items-center justify-center z-50 hidden modal-backdrop">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative border border-slate-100">
+        <h3 class="text-xl font-bold mb-4 text-slate-800">Добавить товар</h3>
+        <div class="space-y-3">
+            <input type="text" id="itemCode" placeholder="Код товара" class="w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500">
+            <input type="text" id="itemName" placeholder="Наименование товара" class="w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500">
+            <select id="itemUom" class="w-full border rounded-xl p-3 bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="шт">шт</option><option value="кг">кг</option><option value="м">м</option><option value="кор">кор</option><option value="л">л</option>
+            </select>
+        </div>
+        <div class="flex justify-end gap-2 mt-5">
+            <button id="itemModalCancelBtn" class="px-4 py-2 bg-slate-100 rounded-xl font-medium text-slate-600 hover:bg-slate-200 transition">Отмена</button>
+            <button id="itemModalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded-xl font-medium shadow-md shadow-blue-600/20 hover:bg-blue-700 transition">Добавить</button>
+        </div>
+    </div>
+</div>
+
+<div id="userModal" class="fixed inset-0 flex items-center justify-center z-50 hidden modal-backdrop">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative border border-slate-100">
+        <div class="flex items-center gap-3 mb-4 border-b pb-3">
+            <div class="p-2 bg-blue-50 text-blue-600 rounded-lg"><i class="fas fa-user-plus text-xl"></i></div>
+            <h3 class="text-xl font-bold text-slate-800">Новый пользователь</h3>
+        </div>
+        <div class="space-y-3">
+            <input type="text" id="userFullname" placeholder="ФИО сотрудника" class="w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500">
+            <input type="text" id="userUsername" placeholder="Логин (Уникальный)" class="w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500">
+            <input type="password" id="userPassword" placeholder="Пароль" class="w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500">
+            <select id="userRole" class="w-full border rounded-xl p-3 bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="storekeeper">Кладовщик (Только операции)</option>
+                <option value="manager">Менеджер склада (Полный склад + Инвентарь)</option>
+                <option value="analyst">Аналитик (Остатки + Отчеты)</option>
+                <option value="admin">Администратор (Полный доступ)</option>
+            </select>
+        </div>
+        <div class="flex justify-end gap-2 mt-5 border-t pt-3">
+            <button id="userModalCancelBtn" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition text-sm font-medium">Отмена</button>
+            <button id="userModalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition text-sm font-medium">Создать аккаунт</button>
+        </div>
+    </div>
+</div>
+
+<div id="toastNotification" class="toast-notification">
+    <div id="toastIconContainer" class="p-2 rounded-lg text-white">
+        <i id="toastIcon" class="fas"></i>
+    </div>
+    <div>
+        <h4 id="toastTitle" class="font-bold text-slate-800 text-sm"></h4>
+        <p id="toastMessage" class="text-slate-500 text-xs mt-0.5"></p>
+    </div>
+</div>
+
+<input type="file" id="nomenclatureCsvInput" accept=".csv" class="hidden">
+<input type="file" id="inventoryCsvInput" accept=".csv" class="hidden">
+
+<script src="auth.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

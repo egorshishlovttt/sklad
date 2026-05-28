@@ -48,13 +48,6 @@
       "password": "$2a$08$Ooi7zsNCWC7INNG4OejaJuCNwV7qOmdhcIk/yi/pb6yOgCvsNSy0e",
       "fullname": "123",
       "role": "storekeeper"
-    },
-    {
-      "id": 8,
-      "username": "test",
-      "password": "$2a$08$UNxINTeC95ztjeQOCSNYceqoNJPFmrgUpy43sYwP0mC0UM0TW0vsi",
-      "fullname": "test",
-      "role": "manager"
     }
   ],
   "items": [
@@ -92,27 +85,44 @@
       "item_code": "Т007",
       "name": "ссковородка",
       "uom": "шт"
+    },
+    {
+      "item_code": "Т008",
+      "name": "123",
+      "uom": "шт"
+    },
+    {
+      "item_code": "Т009",
+      "name": "12333333",
+      "uom": "шт"
     }
   ],
   "receipts": [
     {
-      "doc_id": 102,
+      "doc_id": 106,
       "item_code": "Т001",
-      "qty": 1,
-      "date": "2026-05-28"
+      "qty": 9,
+      "date": "2026-05-28T23:03:58"
     },
     {
-      "doc_id": 103,
+      "doc_id": 107,
       "item_code": "Т001",
-      "qty": 111,
+      "qty": 1,
+      "date": "2026-05-28T20:22:52"
+    }
+  ],
+  "issues": [
+    {
+      "doc_id": 201,
+      "item_code": "Т001",
+      "qty": 123,
       "date": "2026-05-28"
     }
   ],
-  "issues": [],
   "stockExpected": [
     {
       "item_code": "Т001",
-      "qty_expected": 100,
+      "qty_expected": 0,
       "date": "2026-05-28"
     },
     {
@@ -144,8 +154,18 @@
       "item_code": "Т007",
       "qty_expected": 0,
       "date": "2026-05-28"
+    },
+    {
+      "item_code": "Т008",
+      "qty_expected": 0,
+      "date": "2026-05-28"
+    },
+    {
+      "item_code": "Т009",
+      "qty_expected": 0,
+      "date": "2026-05-28"
     }
   ],
-  "nextDocIdReceipt": 104,
-  "nextDocIdIssue": 201
+  "nextDocIdReceipt": 108,
+  "nextDocIdIssue": 203
 }
