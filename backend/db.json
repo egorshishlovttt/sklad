@@ -1,0 +1,138 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "admin",
+      "password": "$2a$08$PzAIx3tVSkuag8deXwiOdu7YC6UVLXUOyKxCwQVIeyD.hh38xfAga",
+      "fullname": "Администратор",
+      "role": "admin"
+    },
+    {
+      "id": 2,
+      "username": "ivan",
+      "password": "$2a$08$7DJUEXLTXHHzkqoOK7hWA.R5g86CgfqOj/viVgqXByJnOTXgNeVaC",
+      "fullname": "Иван Кладовщиков",
+      "role": "storekeeper"
+    },
+    {
+      "id": 3,
+      "username": "petrov",
+      "password": "$2a$08$N.Qt6TcTk9g6g3eXHJN5qeLcH34W.SFo.Cjg7fItAVlcN7dD7i4Gy",
+      "fullname": "Пётр Менеджеров",
+      "role": "manager"
+    },
+    {
+      "id": 4,
+      "username": "sidorov",
+      "password": "$2a$08$Dv2n7vaWpogZLkP9WkMAVOEpFv0yO8p84qqMnF6ZUpDJ0sRAlRUuG",
+      "fullname": "Сидор Аналитиков",
+      "role": "analyst"
+    },
+    {
+      "id": 5,
+      "username": "123",
+      "password": "$2a$08$f5e3yaOeqQIaYnW/POaKe.JAFK8Hz9KJXALjJ4TNZqkGeajYT3Uim",
+      "fullname": "123",
+      "role": "admin"
+    },
+    {
+      "id": 6,
+      "username": "artem",
+      "password": "$2a$08$mlKddmsF8kctJRCpvcpkd.XZ0uPmWxFAMlVI0oKvfMWRyG5HKGdsu",
+      "fullname": "artem",
+      "role": "admin"
+    }
+  ],
+  "items": [
+    {
+      "item_code": "Т001",
+      "name": "Деталь X1",
+      "uom": "шт"
+    },
+    {
+      "item_code": "Т002",
+      "name": "Деталь X2",
+      "uom": "шт"
+    },
+    {
+      "item_code": "Т003",
+      "name": "Упаковка",
+      "uom": "кор"
+    },
+    {
+      "item_code": "Т004",
+      "name": "Смазка",
+      "uom": "л"
+    },
+    {
+      "item_code": "Т005",
+      "name": "Инструмент",
+      "uom": "шт"
+    },
+    {
+      "item_code": "Т006",
+      "name": "123",
+      "uom": "кг"
+    },
+    {
+      "item_code": "Т007",
+      "name": "ссковородка",
+      "uom": "шт"
+    }
+  ],
+  "receipts": [
+    {
+      "doc_id": 100,
+      "item_code": "Т007",
+      "qty": 123,
+      "date": "2026-05-28"
+    }
+  ],
+  "issues": [
+    {
+      "doc_id": 200,
+      "item_code": "Т007",
+      "qty": 123,
+      "date": "2026-05-28"
+    }
+  ],
+  "stockExpected": [
+    {
+      "item_code": "Т001",
+      "qty_expected": 0,
+      "date": "2026-05-28"
+    },
+    {
+      "item_code": "Т002",
+      "qty_expected": 0,
+      "date": "2026-05-28"
+    },
+    {
+      "item_code": "Т003",
+      "qty_expected": 0,
+      "date": "2026-05-28"
+    },
+    {
+      "item_code": "Т004",
+      "qty_expected": 0,
+      "date": "2026-05-28"
+    },
+    {
+      "item_code": "Т005",
+      "qty_expected": 0,
+      "date": "2026-05-28"
+    },
+    {
+      "item_code": "Т006",
+      "qty_expected": 0,
+      "date": "2026-05-28"
+    },
+    {
+      "item_code": "Т007",
+      "qty_expected": 0,
+      "date": "2026-05-28"
+    }
+  ],
+  "nextDocIdReceipt": 101,
+  "nextDocIdIssue": 201
+}
