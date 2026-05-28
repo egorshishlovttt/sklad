@@ -6,7 +6,7 @@ meta:
 
 build:
   requirements:
-    - package.json
+    - backend/package.json
   artifacts:
     - node_modules
     - server.js
@@ -17,4 +17,4 @@ build:
     - style.css
 
 run:
-  command: node server.js
+  command: node backend/server.js
