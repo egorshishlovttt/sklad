@@ -31,7 +31,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.appendChild(input);
     }
 
-    // Использование стандартного ISO формата для корректного сравнения дат в БД и JS
     function getLocalDateTimeString() {
         return new Date().toISOString();
     }
@@ -94,18 +93,15 @@ document.addEventListener('DOMContentLoaded', function() {
         if (allowed.includes('admin')) adminUsers = await apiRequest('/admin/users') || [];
     }
 
-    // Исправлено: Сравнение временных меток через перевод в Date объект
     function getCalculatedStock(asOfDate = null) {
         const targetTime = asOfDate ? new Date(asOfDate).getTime() : Date.now();
         const map = new Map();
         
-        // Сначала добавляем все приходы
         receipts.forEach(r => { 
             if(new Date(r.date).getTime() <= targetTime) {
                 map.set(r.item_code, (map.get(r.item_code) || 0) + parseFloat(r.qty));
             }
         });
-        // Затем вычитаем расходы
         issues.forEach(i => { 
             if(new Date(i.date).getTime() <= targetTime) {
                 map.set(i.item_code, (map.get(i.item_code) || 0) - parseFloat(i.qty));
@@ -302,24 +298,22 @@ document.addEventListener('DOMContentLoaded', function() {
         handleMovementCsvImport(e, '/issues', 'issue');
     };
 
-    // Исправлено: Динамический перерасчет остатков прямо во время цикла импорта строк CSV
     function handleMovementCsvImport(e, endpoint, tabName) {
         const file = e.target.files[0]; if(!file) return;
         const reader = new FileReader();
         reader.onload = async function(evt) {
             const lines = evt.target.result.split('\n').map(l => l.replace('\r', '').trim()); 
-            let successCount = 0;
             const currentUserName = window.appState.currentUser.fullname || window.appState.currentUser.username;
-
-            // Локальный кеш для отслеживания списаний внутри текущего файла импорта
-            const localSpentMap = new Map();
+            const stockMap = getCalculatedStock();
+            const tempSpentMap = new Map();
+            
+            let validRows = [];
+            let conflictingRows = [];
 
             for(let i = 0; i < lines.length; i++) {
                 const line = lines[i]; if(!line || i === 0) continue; 
-                
                 let sep = ',';
                 if ((line.match(/;/g) || []).length > (line.match(/,/g) || []).length) sep = ';';
-                
                 const cols = line.split(sep); 
                 if(cols.length >= 2) {
                     const item_code = cols[0].trim();
@@ -330,29 +324,80 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (isNaN(qty) || qty <= 0 || !item_code) continue;
 
                     if (tabName === 'issue') {
-                        const currentStockMap = getCalculatedStock();
-                        const maxAvailable = currentStockMap.get(item_code) || 0;
-                        const alreadySpentInSession = localSpentMap.get(item_code) || 0;
-                        
-                        if (qty > (maxAvailable - alreadySpentInSession)) {
-                            showToast('Пропущено при импорте', `Товар ${item_code}: недостаточно остатка (Доступно: ${maxAvailable - alreadySpentInSession})`, 'amber');
-                            continue;
-                        }
-                        localSpentMap.set(item_code, alreadySpentInSession + qty);
-                    }
+                        const currentAvailable = stockMap.get(item_code) || 0;
+                        const alreadySpent = tempSpentMap.get(item_code) || 0;
+                        const finalAvailable = currentAvailable - alreadySpent;
 
+                        if (qty > finalAvailable) {
+                            const itemObj = items.find(it => it.item_code === item_code);
+                            const itemName = itemObj ? itemObj.name : 'Неизвестный товар';
+                            conflictingRows.push({
+                                line: i + 1,
+                                item_code,
+                                name: itemName,
+                                requested: qty,
+                                available: finalAvailable
+                            });
+                        } else {
+                            tempSpentMap.set(item_code, alreadySpent + qty);
+                            validRows.push({ item_code, qty });
+                        }
+                    } else {
+                        validRows.push({ item_code, qty });
+                    }
+                }
+            }
+
+            const uploadRows = async (rowsToUpload) => {
+                let successCount = 0;
+                for (const row of rowsToUpload) {
                     const localTime = getLocalDateTimeString();
                     await apiRequest(endpoint, 'POST', { 
-                        item_code: item_code, 
-                        qty: qty,
+                        item_code: row.item_code, 
+                        qty: row.qty,
                         date: localTime, 
                         created_by: currentUserName 
                     });
                     successCount++;
                 }
+                if (successCount > 0) {
+                    showToast('Импорт завершен', `Успешно проведено документов: ${successCount}`, 'success');
+                }
+                switchTab(tabName);
+            };
+
+            if (tabName === 'issue' && conflictingRows.length > 0) {
+                const modal = document.getElementById('csvConflictModal');
+                const listContainer = document.getElementById('csvConflictList');
+                const cancelBtn = document.getElementById('csvCancelAllBtn');
+                const partialBtn = document.getElementById('csvProceedPartialBtn');
+
+                listContainer.innerHTML = conflictingRows.map(r => 
+                    `<div>Строка ${r.line}: ${r.item_code} "${r.name}" — затребовано ${r.requested}, в наличии ${r.available}</div>`
+                ).join('');
+
+                modal.classList.remove('hidden');
+
+                cancelBtn.onclick = () => {
+                    modal.classList.add('hidden');
+                    showToast('Импорт отменен', 'Операция полностью отклонена пользователем.', 'info');
+                };
+
+                partialBtn.onclick = async () => {
+                    modal.classList.add('hidden');
+                    if (validRows.length === 0) {
+                        showToast('Нечего проводить', 'Нет строк, количество которых удовлетворяет остаткам на складе.', 'error');
+                        return;
+                    }
+                    await uploadRows(validRows);
+                };
+            } else {
+                if (validRows.length > 0) {
+                    await uploadRows(validRows);
+                } else {
+                    showToast('Ошибка импорта', 'Файл не содержит корректных данных для загрузки.', 'error');
+                }
             }
-            showToast('Импорт завершен', `Успешно проведено документов: ${successCount}`, 'success');
-            switchTab(tabName);
         };
         reader.readAsText(file, 'UTF-8');
         e.target.value = ''; 
@@ -387,7 +432,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('movementModal').classList.remove('hidden');
     }
 
-    // Исправлено: Валидация остатка перед отправкой на бэкенд
     document.getElementById('modalConfirmBtn').onclick = async () => {
         const item_code = document.getElementById('modalItemCode').value; 
         const qty = parseFloat(document.getElementById('modalQty').value); 
@@ -628,7 +672,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 banner.innerHTML = `<i class="fas fa-check-circle mr-2"></i>Инвентаризационная ведомость закрыта без отклонений.`;
             } else {
                 banner.className = "p-4 bg-rose-50 border-l-4 border-rose-500 rounded-xl text-rose-800 text-sm font-medium";
-                banner.innerHTML = `<i class="fas fa-exclamation-triangle mr-2"></i>Зафиксировано <strong>${deviations.length} отклонений</strong> in инвентаризационной ведомости.`;
+                banner.innerHTML = `<i class="fas fa-exclamation-triangle mr-2"></i>Зафиксировано <strong>${deviations.length} отклонений</strong> в инвентаризационной ведомости.`;
             }
             displayInventoryProtocol(deviations);
         }
