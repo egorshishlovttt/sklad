@@ -31,15 +31,14 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.appendChild(input);
     }
 
+    // Использование стандартного ISO формата для корректного сравнения дат в БД и JS
     function getLocalDateTimeString() {
-        const tzoffset = (new Date()).getTimezoneOffset() * 60000; 
-        const localISOTime = (new Date(Date.now() - tzoffset)).toISOString();
-        return localISOTime.slice(0, 19).replace('T', ' ');
+        return new Date().toISOString();
     }
 
     function formatDateTime(dateStr) {
         if (!dateStr) return '—';
-        return dateStr.replace('T', ' ');
+        return dateStr.replace('T', ' ').slice(0, 19);
     }
 
     function showToast(title, message, type = 'error') {
@@ -95,12 +94,23 @@ document.addEventListener('DOMContentLoaded', function() {
         if (allowed.includes('admin')) adminUsers = await apiRequest('/admin/users') || [];
     }
 
+    // Исправлено: Сравнение временных меток через перевод в Date объект
     function getCalculatedStock(asOfDate = null) {
-        const targetDate = asOfDate || new Date().toISOString();
+        const targetTime = asOfDate ? new Date(asOfDate).getTime() : Date.now();
         const map = new Map();
-        receipts.forEach(r => { if(r.date <= targetDate) map.set(r.item_code, (map.get(r.item_code)||0) + r.qty); });
-        issues.forEach(i => { if(i.date <= targetDate) map.set(i.item_code, (map.get(i.item_code)||0) - i.qty); });
-        for(let [k,v] of map.entries()) if(v<0) map.set(k,0);
+        
+        // Сначала добавляем все приходы
+        receipts.forEach(r => { 
+            if(new Date(r.date).getTime() <= targetTime) {
+                map.set(r.item_code, (map.get(r.item_code) || 0) + parseFloat(r.qty));
+            }
+        });
+        // Затем вычитаем расходы
+        issues.forEach(i => { 
+            if(new Date(i.date).getTime() <= targetTime) {
+                map.set(i.item_code, (map.get(i.item_code) || 0) - parseFloat(i.qty));
+            }
+        });
         return map;
     }
 
@@ -292,6 +302,7 @@ document.addEventListener('DOMContentLoaded', function() {
         handleMovementCsvImport(e, '/issues', 'issue');
     };
 
+    // Исправлено: Динамический перерасчет остатков прямо во время цикла импорта строк CSV
     function handleMovementCsvImport(e, endpoint, tabName) {
         const file = e.target.files[0]; if(!file) return;
         const reader = new FileReader();
@@ -299,7 +310,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const lines = evt.target.result.split('\n').map(l => l.replace('\r', '').trim()); 
             let successCount = 0;
             const currentUserName = window.appState.currentUser.fullname || window.appState.currentUser.username;
-            const localTime = getLocalDateTimeString();
+
+            // Локальный кеш для отслеживания списаний внутри текущего файла импорта
+            const localSpentMap = new Map();
 
             for(let i = 0; i < lines.length; i++) {
                 const line = lines[i]; if(!line || i === 0) continue; 
@@ -314,24 +327,28 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (sep === ';') rawQty = rawQty.replace(',', '.');
                     const qty = parseFloat(rawQty);
 
+                    if (isNaN(qty) || qty <= 0 || !item_code) continue;
+
                     if (tabName === 'issue') {
                         const currentStockMap = getCalculatedStock();
                         const maxAvailable = currentStockMap.get(item_code) || 0;
-                        if (qty > maxAvailable) {
-                            showToast('Пропущено при импорте', `Товар ${item_code}: недостаточно остатка (${maxAvailable})`, 'amber');
+                        const alreadySpentInSession = localSpentMap.get(item_code) || 0;
+                        
+                        if (qty > (maxAvailable - alreadySpentInSession)) {
+                            showToast('Пропущено при импорте', `Товар ${item_code}: недостаточно остатка (Доступно: ${maxAvailable - alreadySpentInSession})`, 'amber');
                             continue;
                         }
+                        localSpentMap.set(item_code, alreadySpentInSession + qty);
                     }
 
-                    if (item_code && !isNaN(qty) && qty > 0) {
-                        await apiRequest(endpoint, 'POST', { 
-                            item_code: item_code, 
-                            qty: qty,
-                            date: localTime, 
-                            created_by: currentUserName 
-                        });
-                        successCount++;
-                    }
+                    const localTime = getLocalDateTimeString();
+                    await apiRequest(endpoint, 'POST', { 
+                        item_code: item_code, 
+                        qty: qty,
+                        date: localTime, 
+                        created_by: currentUserName 
+                    });
+                    successCount++;
                 }
             }
             showToast('Импорт завершен', `Успешно проведено документов: ${successCount}`, 'success');
@@ -341,7 +358,6 @@ document.addEventListener('DOMContentLoaded', function() {
         e.target.value = ''; 
     }
 
-    // Полностью восстановленная и исправленная функция удаления документов
     window.delDoc = async (type, id) => { 
         if(confirm('Аннулировать и удалить данный документ движения?')) { 
             const res = await apiRequest(`/${type}/${id}`, 'DELETE'); 
@@ -363,7 +379,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if(timeTimer) clearInterval(timeTimer);
         const updateLabel = () => {
             const lbl = document.getElementById('modalCurrentTimeLabel');
-            if(lbl) lbl.innerText = getLocalDateTimeString();
+            if(lbl) lbl.innerText = formatDateTime(getLocalDateTimeString());
         };
         updateLabel();
         timeTimer = setInterval(updateLabel, 1000);
@@ -371,6 +387,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('movementModal').classList.remove('hidden');
     }
 
+    // Исправлено: Валидация остатка перед отправкой на бэкенд
     document.getElementById('modalConfirmBtn').onclick = async () => {
         const item_code = document.getElementById('modalItemCode').value; 
         const qty = parseFloat(document.getElementById('modalQty').value); 
@@ -611,7 +628,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 banner.innerHTML = `<i class="fas fa-check-circle mr-2"></i>Инвентаризационная ведомость закрыта без отклонений.`;
             } else {
                 banner.className = "p-4 bg-rose-50 border-l-4 border-rose-500 rounded-xl text-rose-800 text-sm font-medium";
-                banner.innerHTML = `<i class="fas fa-exclamation-triangle mr-2"></i>Зафиксировано <strong>${deviations.length} отклонений</strong> в инвентаризационной ведомости.`;
+                banner.innerHTML = `<i class="fas fa-exclamation-triangle mr-2"></i>Зафиксировано <strong>${deviations.length} отклонений</strong> in инвентаризационной ведомости.`;
             }
             displayInventoryProtocol(deviations);
         }

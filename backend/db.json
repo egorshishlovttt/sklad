@@ -28,41 +28,97 @@
       "item_code": "Т004",
       "name": "Смазка",
       "uom": "л"
+    },
+    {
+      "item_code": "Т005",
+      "name": "123",
+      "uom": "шт"
+    },
+    {
+      "item_code": "Т006",
+      "name": "4",
+      "uom": "шт"
     }
   ],
   "receipts": [
     {
       "doc_id": 1,
       "item_code": "Т001",
-      "qty": 15,
-      "date": "2026-05-29 21:50:48",
+      "qty": 111,
+      "date": "2026-05-29T22:49:20.119Z",
       "created_by": "Администратор"
     },
     {
       "doc_id": 2,
       "item_code": "Т002",
-      "qty": 35,
-      "date": "2026-05-29 21:51:05",
-      "created_by": "test"
+      "qty": 120,
+      "date": "2026-05-29T22:49:20.125Z",
+      "created_by": "Администратор"
     },
     {
       "doc_id": 3,
-      "item_code": "Т001",
-      "qty": 4,
-      "date": "2026-05-29 19:19:26",
+      "item_code": "Т005",
+      "qty": 15,
+      "date": "2026-05-29T22:49:20.130Z",
       "created_by": "Администратор"
     }
   ],
-  "issues": [],
+  "issues": [
+    {
+      "doc_id": 1,
+      "item_code": "Т001",
+      "qty": 50,
+      "date": "2026-05-29T22:49:26.969Z",
+      "created_by": "Администратор"
+    },
+    {
+      "doc_id": 2,
+      "item_code": "Т002",
+      "qty": 120,
+      "date": "2026-05-29T22:49:26.974Z",
+      "created_by": "Администратор"
+    },
+    {
+      "doc_id": 3,
+      "item_code": "Т005",
+      "qty": 15,
+      "date": "2026-05-29T22:49:26.978Z",
+      "created_by": "Администратор"
+    },
+    {
+      "doc_id": 4,
+      "item_code": "Т001",
+      "qty": 30,
+      "date": "2026-05-29T22:49:26.983Z",
+      "created_by": "Администратор"
+    },
+    {
+      "doc_id": 5,
+      "item_code": "Т001",
+      "qty": 20,
+      "date": "2026-05-29T22:49:27.000Z",
+      "created_by": "Администратор"
+    }
+  ],
   "stockExpected": [
     {
+      "item_code": "Т007",
+      "qty_expected": 0,
+      "date": "2026-05-29"
+    },
+    {
+      "item_code": "Т008",
+      "qty_expected": 0,
+      "date": "2026-05-29"
+    },
+    {
       "item_code": "Т001",
-      "qty_expected": 15,
+      "qty_expected": 0,
       "date": "2026-05-29"
     },
     {
       "item_code": "Т002",
-      "qty_expected": 35,
+      "qty_expected": 0,
       "date": "2026-05-29"
     },
     {
@@ -82,16 +138,6 @@
     },
     {
       "item_code": "Т006",
-      "qty_expected": 0,
-      "date": "2026-05-29"
-    },
-    {
-      "item_code": "Т007",
-      "qty_expected": 0,
-      "date": "2026-05-29"
-    },
-    {
-      "item_code": "Т008",
       "qty_expected": 0,
       "date": "2026-05-29"
     }
