@@ -6,55 +6,6 @@
       "password": "$2a$08$PzAIx3tVSkuag8deXwiOdu7YC6UVLXUOyKxCwQVIeyD.hh38xfAga",
       "fullname": "Администратор",
       "role": "admin"
-    },
-    {
-      "id": 2,
-      "username": "ivan",
-      "password": "$2a$08$7DJUEXLTXHHzkqoOK7hWA.R5g86CgfqOj/viVgqXByJnOTXgNeVaC",
-      "fullname": "Иван Кладовщиков",
-      "role": "storekeeper"
-    },
-    {
-      "id": 3,
-      "username": "petrov",
-      "password": "$2a$08$N.Qt6TcTk9g6g3eXHJN5qeLcH34W.SFo.Cjg7fItAVlcN7dD7i4Gy",
-      "fullname": "Пётр Менеджеров",
-      "role": "manager"
-    },
-    {
-      "id": 4,
-      "username": "sidorov",
-      "password": "$2a$08$Dv2n7vaWpogZLkP9WkMAVOEpFv0yO8p84qqMnF6ZUpDJ0sRAlRUuG",
-      "fullname": "Сидор Аналитиков",
-      "role": "analyst"
-    },
-    {
-      "id": 5,
-      "username": "123",
-      "password": "$2a$08$f5e3yaOeqQIaYnW/POaKe.JAFK8Hz9KJXALjJ4TNZqkGeajYT3Uim",
-      "fullname": "123",
-      "role": "admin"
-    },
-    {
-      "id": 6,
-      "username": "artem",
-      "password": "$2a$08$mlKddmsF8kctJRCpvcpkd.XZ0uPmWxFAMlVI0oKvfMWRyG5HKGdsu",
-      "fullname": "artem",
-      "role": "admin"
-    },
-    {
-      "id": 7,
-      "username": "12345",
-      "password": "$2a$08$Ooi7zsNCWC7INNG4OejaJuCNwV7qOmdhcIk/yi/pb6yOgCvsNSy0e",
-      "fullname": "123",
-      "role": "storekeeper"
-    },
-    {
-      "id": 8,
-      "username": "test1",
-      "password": "$2a$08$odoD663450TP45XkeWEft.0uvqMRAadmQ351HMNcqHOTKR47AMOE2",
-      "fullname": "test",
-      "role": "storekeeper"
     }
   ],
   "items": [
@@ -77,104 +28,89 @@
       "item_code": "Т004",
       "name": "Смазка",
       "uom": "л"
-    },
-    {
-      "item_code": "Т005",
-      "name": "Инструмент",
-      "uom": "шт"
-    },
-    {
-      "item_code": "Т006",
-      "name": "123",
-      "uom": "кг"
-    },
-    {
-      "item_code": "Т007",
-      "name": "ссковородка",
-      "uom": "шт"
-    },
-    {
-      "item_code": "Т008",
-      "name": "fgfg",
-      "uom": "м"
     }
   ],
   "receipts": [
     {
-      "doc_id": 108,
+      "doc_id": 1,
       "item_code": "Т001",
-      "qty": 123,
-      "date": "2026-05-28T21:34:04"
+      "qty": 15,
+      "date": "2026-05-29 21:50:48",
+      "created_by": "Администратор"
     },
     {
-      "doc_id": 109,
-      "item_code": "Т008",
-      "qty": 123,
-      "date": "2026-05-28T21:53:09"
+      "doc_id": 2,
+      "item_code": "Т002",
+      "qty": 35,
+      "date": "2026-05-29 21:51:05",
+      "created_by": "test"
     },
     {
-      "doc_id": 110,
+      "doc_id": 3,
+      "item_code": "Т001",
+      "qty": 4,
+      "date": "2026-05-29 19:19:26",
+      "created_by": "Администратор"
+    },
+    {
+      "doc_id": 4,
       "item_code": "Т001",
       "qty": 123,
-      "date": "2026-05-28T21:57:04"
+      "date": "2026-05-30 00:52:06",
+      "created_by": "Администратор"
     }
   ],
   "issues": [
     {
-      "doc_id": 203,
+      "doc_id": 1,
       "item_code": "Т001",
-      "qty": 2,
-      "date": "2026-05-28T21:35:17"
-    },
-    {
-      "doc_id": 204,
-      "item_code": "Т008",
-      "qty": 23,
-      "date": "2026-05-28T21:53:17"
+      "qty": 11,
+      "date": "2026-05-30 00:52:20",
+      "created_by": "Администратор"
     }
   ],
   "stockExpected": [
     {
       "item_code": "Т001",
-      "qty_expected": 121,
-      "date": "2026-05-28"
+      "qty_expected": 15,
+      "date": "2026-05-29"
     },
     {
       "item_code": "Т002",
-      "qty_expected": 0,
-      "date": "2026-05-28"
+      "qty_expected": 35,
+      "date": "2026-05-29"
     },
     {
       "item_code": "Т003",
       "qty_expected": 0,
-      "date": "2026-05-28"
+      "date": "2026-05-29"
     },
     {
       "item_code": "Т004",
       "qty_expected": 0,
-      "date": "2026-05-28"
+      "date": "2026-05-29"
     },
     {
       "item_code": "Т005",
       "qty_expected": 0,
-      "date": "2026-05-28"
+      "date": "2026-05-29"
     },
     {
       "item_code": "Т006",
       "qty_expected": 0,
-      "date": "2026-05-28"
+      "date": "2026-05-29"
     },
     {
       "item_code": "Т007",
       "qty_expected": 0,
-      "date": "2026-05-28"
+      "date": "2026-05-29"
     },
     {
       "item_code": "Т008",
-      "qty_expected": 90,
-      "date": "2026-05-28"
+      "qty_expected": 0,
+      "date": "2026-05-29"
     }
   ],
-  "nextDocIdReceipt": 111,
-  "nextDocIdIssue": 205
+  "nextDocIdReceipt": 230,
+  "nextDocIdIssue": 209
 }
