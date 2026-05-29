@@ -14,6 +14,29 @@ document.addEventListener('DOMContentLoaded', function() {
         analyst: ['stock', 'reports']
     };
 
+    if (!document.getElementById('receiptCsvInput')) {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.id = 'receiptCsvInput';
+        input.accept = '.csv';
+        input.className = 'hidden';
+        document.body.appendChild(input);
+    }
+    if (!document.getElementById('issueCsvInput')) {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.id = 'issueCsvInput';
+        input.accept = '.csv';
+        input.className = 'hidden';
+        document.body.appendChild(input);
+    }
+
+    function getLocalDateTimeString() {
+        const tzoffset = (new Date()).getTimezoneOffset() * 60000; 
+        const localISOTime = (new Date(Date.now() - tzoffset)).toISOString();
+        return localISOTime.slice(0, 19).replace('T', ' ');
+    }
+
     function formatDateTime(dateStr) {
         if (!dateStr) return '—';
         return dateStr.replace('T', ' ');
@@ -119,7 +142,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const container = document.getElementById('tabsContainer');
         const role = window.appState.currentUser?.role;
         const allowed = roleTabs[role] || ['items'];
-        const names = { items: '📦 Номенклатура', receipt: '📥 Приход', issue: '📤 Расход', stock: '📊 Остатки', inventory: '🔍 Инвентаризация', reports: '📈 Отчёты', admin: '👑 Администрирование' };
+        const names = { items: '📦 Номенклатура', receipt: '📥 Приход', issue: '📤 Расход', stock: '📊 Остатки', inventory: '🔍 Инвентаризация', reports: '📈 Отчёты', admin: '👑 ...' };
+        if (names.admin && role === 'admin') names.admin = '👑 Администрирование';
+        
         container.innerHTML = '';
         allowed.forEach(tabId => {
             const btn = document.createElement('button');
@@ -215,34 +240,108 @@ document.addEventListener('DOMContentLoaded', function() {
         const container = document.getElementById('receiptTab');
         container.innerHTML = `
             <div class="bg-white rounded-2xl shadow border border-slate-100 p-6">
-                <div class="flex justify-between items-center mb-5">
+                <div class="flex justify-between items-center mb-5 flex-wrap gap-2">
                     <h2 class="text-xl font-bold text-slate-800"><i class="fas fa-arrow-down text-emerald-500 mr-2"></i>Документы прихода (Поступления)</h2>
-                    <button id="openReceiptModalBtn" class="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-emerald-700 transition"><i class="fas fa-plus mr-1"></i>Оформить приход</button>
+                    <div class="flex gap-2">
+                        <button id="importReceiptCsvBtn" class="bg-amber-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-amber-700 transition"><i class="fas fa-file-import mr-1"></i> Импорт CSV</button>
+                        <button id="openReceiptModalBtn" class="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-emerald-700 transition"><i class="fas fa-plus mr-1"></i>Оформить приход</button>
+                    </div>
                 </div>
                 <div class="scrollable-table border border-slate-100 rounded-xl">
                     <table><thead><tr><th>№ Документа</th><th>Код товара</th><th>Наименование товара</th><th>Количество</th><th>Дата и время</th><th>Исполнитель</th><th class="w-20"></th></tr></thead>
-                    <tbody>${receipts.map(r => { const item = items.find(i=>i.item_code===r.item_code); return `<tr><td>DOC-REC-${r.doc_id}</td><td class="font-bold">${r.item_code}</td><td>${item ? item.name : 'Неизвестный товар'}</td><td class="font-mono text-emerald-600 font-bold">+${r.qty}</td><td class="text-xs font-mono text-slate-600">${formatDateTime(r.date)}</td><td><span class="text-xs font-medium text-slate-700 bg-slate-100 px-2 py-1 rounded"><i class="fas fa-user text-slate-400 mr-1"></i>${r.created_by || 'Система'}</span></td><td><button onclick="window.delDoc('receipts', ${r.doc_id})" class="text-rose-500 hover:text-rose-700"><i class="fas fa-trash"></i></button></td></tr>`; }).join('')}</tbody></table>
+                    <tbody>${receipts.map(r => { 
+                        const item = items.find(i=>i.item_code===r.item_code); 
+                        const creatorName = r.created_by || r.username || (window.appState.currentUser && (window.appState.currentUser.fullname || window.appState.currentUser.username)) || 'Система';
+                        return `<tr><td>DOC-REC-${r.doc_id}</td><td class="font-bold">${r.item_code}</td><td>${item ? item.name : 'Неизвестный товар'}</td><td class="font-mono text-emerald-600 font-bold">+${r.qty}</td><td class="text-xs font-mono text-slate-600">${formatDateTime(r.date)}</td><td><span class="text-xs font-medium text-slate-700 bg-slate-100 px-2 py-1 rounded"><i class="fas fa-user text-slate-400 mr-1"></i>${creatorName}</span></td><td><button onclick="window.delDoc('receipts', ${r.doc_id})" class="text-rose-500 hover:text-rose-700"><i class="fas fa-trash"></i></button></td></tr>`; 
+                    }).join('')}</tbody></table>
                 </div>
             </div>`;
         document.getElementById('openReceiptModalBtn').onclick = () => openMovementModal('receipt');
+        document.getElementById('importReceiptCsvBtn').onclick = () => document.getElementById('receiptCsvInput').click();
     }
+
+    document.getElementById('receiptCsvInput').onchange = function(e) {
+        handleMovementCsvImport(e, '/receipts', 'receipt');
+    };
 
     function renderIssues() {
         const container = document.getElementById('issueTab');
         container.innerHTML = `
             <div class="bg-white rounded-2xl shadow border border-slate-100 p-6">
-                <div class="flex justify-between items-center mb-5">
+                <div class="flex justify-between items-center mb-5 flex-wrap gap-2">
                     <h2 class="text-xl font-bold text-slate-800"><i class="fas fa-arrow-up text-orange-500 mr-2"></i>Документы расхода (Списание/Отгрузка)</h2>
-                    <button id="openIssueModalBtn" class="bg-orange-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-orange-700 transition"><i class="fas fa-plus mr-1"></i>Оформить расход</button>
+                    <div class="flex gap-2">
+                        <button id="importIssueCsvBtn" class="bg-amber-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-amber-700 transition"><i class="fas fa-file-import mr-1"></i> Импорт CSV</button>
+                        <button id="openIssueModalBtn" class="bg-orange-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-orange-700 transition"><i class="fas fa-plus mr-1"></i>Оформить расход</button>
+                    </div>
                 </div>
                 <div class="scrollable-table border border-slate-100 rounded-xl">
                     <table><thead><tr><th>№ Документа</th><th>Код товара</th><th>Наименование товара</th><th>Количество</th><th>Дата и время</th><th>Исполнитель</th><th class="w-20"></th></tr></thead>
-                    <tbody>${issues.map(i => { const item = items.find(it=>it.item_code===i.item_code); return `<tr><td>DOC-ISS-${i.doc_id}</td><td class="font-bold">${i.item_code}</td><td>${item ? item.name : 'Неизвестный товар'}</td><td class="font-mono text-rose-600 font-bold">-${i.qty}</td><td class="text-xs font-mono text-slate-600">${formatDateTime(i.date)}</td><td><span class="text-xs font-medium text-slate-700 bg-slate-100 px-2 py-1 rounded"><i class="fas fa-user text-slate-400 mr-1"></i>${i.created_by || 'Система'}</span></td><td><button onclick="window.delDoc('issues', ${i.doc_id})" class="text-rose-500 hover:text-rose-700"><i class="fas fa-trash"></i></button></td></tr>`; }).join('')}</tbody></table>
+                    <tbody>${issues.map(i => { 
+                        const item = items.find(it=>it.item_code===i.item_code); 
+                        const creatorName = i.created_by || i.username || (window.appState.currentUser && (window.appState.currentUser.fullname || window.appState.currentUser.username)) || 'Система';
+                        return `<tr><td>DOC-ISS-${i.doc_id}</td><td class="font-bold">${i.item_code}</td><td>${item ? item.name : 'Неизвестный товар'}</td><td class="font-mono text-rose-600 font-bold">-${i.qty}</td><td class="text-xs font-mono text-slate-600">${formatDateTime(i.date)}</td><td><span class="text-xs font-medium text-slate-700 bg-slate-100 px-2 py-1 rounded"><i class="fas fa-user text-slate-400 mr-1"></i>${creatorName}</span></td><td><button onclick="window.delDoc('issues', ${i.doc_id})" class="text-rose-500 hover:text-rose-700"><i class="fas fa-trash"></i></button></td></tr>`; 
+                    }).join('')}</tbody></table>
                 </div>
             </div>`;
         document.getElementById('openIssueModalBtn').onclick = () => openMovementModal('issue');
+        document.getElementById('importIssueCsvBtn').onclick = () => document.getElementById('issueCsvInput').click();
     }
 
+    document.getElementById('issueCsvInput').onchange = function(e) {
+        handleMovementCsvImport(e, '/issues', 'issue');
+    };
+
+    function handleMovementCsvImport(e, endpoint, tabName) {
+        const file = e.target.files[0]; if(!file) return;
+        const reader = new FileReader();
+        reader.onload = async function(evt) {
+            const lines = evt.target.result.split('\n').map(l => l.replace('\r', '').trim()); 
+            let successCount = 0;
+            const currentUserName = window.appState.currentUser.fullname || window.appState.currentUser.username;
+            const localTime = getLocalDateTimeString();
+
+            for(let i = 0; i < lines.length; i++) {
+                const line = lines[i]; if(!line || i === 0) continue; 
+                
+                let sep = ',';
+                if ((line.match(/;/g) || []).length > (line.match(/,/g) || []).length) sep = ';';
+                
+                const cols = line.split(sep); 
+                if(cols.length >= 2) {
+                    const item_code = cols[0].trim();
+                    let rawQty = cols[1].trim();
+                    if (sep === ';') rawQty = rawQty.replace(',', '.');
+                    const qty = parseFloat(rawQty);
+
+                    if (tabName === 'issue') {
+                        const currentStockMap = getCalculatedStock();
+                        const maxAvailable = currentStockMap.get(item_code) || 0;
+                        if (qty > maxAvailable) {
+                            showToast('Пропущено при импорте', `Товар ${item_code}: недостаточно остатка (${maxAvailable})`, 'amber');
+                            continue;
+                        }
+                    }
+
+                    if (item_code && !isNaN(qty) && qty > 0) {
+                        await apiRequest(endpoint, 'POST', { 
+                            item_code: item_code, 
+                            qty: qty,
+                            date: localTime, 
+                            created_by: currentUserName 
+                        });
+                        successCount++;
+                    }
+                }
+            }
+            showToast('Импорт завершен', `Успешно проведено документов: ${successCount}`, 'success');
+            switchTab(tabName);
+        };
+        reader.readAsText(file, 'UTF-8');
+        e.target.value = ''; 
+    }
+
+    // Полностью восстановленная и исправленная функция удаления документов
     window.delDoc = async (type, id) => { 
         if(confirm('Аннулировать и удалить данный документ движения?')) { 
             const res = await apiRequest(`/${type}/${id}`, 'DELETE'); 
@@ -263,10 +362,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if(timeTimer) clearInterval(timeTimer);
         const updateLabel = () => {
-            const now = new Date();
-            const formatted = now.toISOString().replace('T', ' ').slice(0, 19);
             const lbl = document.getElementById('modalCurrentTimeLabel');
-            if(lbl) lbl.innerText = formatted;
+            if(lbl) lbl.innerText = getLocalDateTimeString();
         };
         updateLabel();
         timeTimer = setInterval(updateLabel, 1000);
@@ -276,25 +373,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.getElementById('modalConfirmBtn').onclick = async () => {
         const item_code = document.getElementById('modalItemCode').value; 
-        const qty = parseInt(document.getElementById('modalQty').value); 
+        const qty = parseFloat(document.getElementById('modalQty').value); 
         
-        if(!item_code || !qty || qty <= 0) {
+        if(!item_code || !qty || qty <= 0 || isNaN(qty)) {
             showToast('Ошибка корректности', 'Проверьте правильность заполнения всех полей!', 'error');
             return;
         }
 
-        const finalDateTime = new Date().toISOString().slice(0, 19);
+        const finalDateTime = getLocalDateTimeString();
         
         if (currentModalType === 'issue') {
             const currentStockMap = getCalculatedStock();
             const maxAvailable = currentStockMap.get(item_code) || 0;
             if (qty > maxAvailable) {
-                showToast('Списание заблокировано', `Недостаточно свободных единиц на складе. Запрошено: ${qty}. В наличии: ${maxAvailable}.`, 'error');
+                showToast('Списание заблокировано', `Недостаточно свободных единиц на складе. В наличии: ${maxAvailable}.`, 'error');
                 return; 
             }
         }
         
-        const payload = { item_code, qty, date: finalDateTime, created_by: window.appState.currentUser.fullname || window.appState.currentUser.username };
+        const payload = { 
+            item_code, 
+            qty, 
+            date: finalDateTime, 
+            created_by: window.appState.currentUser.fullname || window.appState.currentUser.username 
+        };
         
         if(await apiRequest(currentModalType === 'receipt' ? '/receipts' : '/issues', 'POST', payload)) { 
             if(timeTimer) clearInterval(timeTimer);
@@ -379,9 +481,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const delta = actual !== undefined ? actual - calculated : 0;
 
             totalPositionsCount++;
-            if (actual !== undefined && delta === 0) {
-                accuratePositionsCount++;
-            }
+            if (actual !== undefined && delta === 0) accuratePositionsCount++;
 
             if (stockFilters.deviation === 'match' && delta !== 0) return;
             if (stockFilters.deviation === 'diff' && delta === 0) return;
@@ -422,7 +522,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <tr><th>Код товара</th><th>Наименование товара</th><th class="text-center w-44">Учетные данные</th><th class="text-center w-44">Фактическое наличие</th></tr>
                         </thead>
                         <tbody>${items.map(it => {
-                            return `<tr><td class="font-bold">${it.item_code}</td><td>${it.name}</td><td class="text-center font-mono font-bold text-slate-500 bg-slate-50/50" id="calc_val_${it.item_code}">${calculatedMap.get(it.item_code) || 0}</td><td class="text-center"><input type="number" id="scan_${it.item_code}" class="border border-blue-200 rounded-xl p-1.5 w-32 text-center bg-blue-50/50 font-bold text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white" value="0" min="0"></td></tr>`;
+                            return `<tr><td class="font-bold">${it.item_code}</td><td>${it.name}</td><td class="text-center font-mono font-bold text-slate-500 bg-slate-50/50" id="calc_val_${it.item_code}">${calculatedMap.get(it.item_code) || 0}</td><td class="text-center"><input type="number" id="scan_${it.item_code}" class="border border-blue-200 rounded-xl p-1.5 w-32 text-center bg-blue-50/50 font-bold text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white" value="0" min="0" step="any"></td></tr>`;
                         }).join('')}</tbody>
                     </table>
                 </div>
@@ -446,18 +546,51 @@ document.addEventListener('DOMContentLoaded', function() {
         const file = e.target.files[0]; if(!file) return;
         const reader = new FileReader();
         reader.onload = function(evt) {
-            const lines = evt.target.result.split('\n'); let c = 0;
+            const lines = evt.target.result.split('\n').map(line => line.replace('\r', '').trim()); 
+            const csvTotals = {};
+            let processedLinesCount = 0;
+
             lines.forEach((line, idx) => {
-                if(idx === 0 || !line.trim()) return;
-                const cols = line.split(/[;,]/);
+                if(idx === 0 || !line) return;
+
+                let separator = ',';
+                if ((line.match(/;/g) || []).length > (line.match(/,/g) || []).length) separator = ';';
+
+                const cols = line.split(separator);
                 if(cols.length >= 2) {
-                    const inputEl = document.getElementById(`scan_${cols[0].trim()}`);
-                    if(inputEl) { inputEl.value = parseFloat(cols[1].trim()) || 0; c++; }
+                    const itemCode = cols[0].trim();
+                    let rawQty = cols[1].trim();
+                    if (separator === ';') rawQty = rawQty.replace(',', '.');
+                    const qty = parseFloat(rawQty);
+                    
+                    if (!isNaN(qty) && itemCode) {
+                        if (csvTotals[itemCode] !== undefined) {
+                            csvTotals[itemCode] += qty;
+                        } else {
+                            csvTotals[itemCode] = qty;
+                        }
+                        processedLinesCount++;
+                    }
                 }
             });
-            showToast('Данные подтянуты', `Импортирован факт для ${c} позиций.`, 'info');
+
+            let successCount = 0;
+            for (const itemCode in csvTotals) {
+                const inputEl = document.getElementById(`scan_${itemCode}`);
+                if (inputEl) {
+                    inputEl.value = csvTotals[itemCode];
+                    successCount++;
+                }
+            }
+
+            if (successCount === 0) {
+                showToast('Ошибка импорта', 'Не удалось сопоставить товары. Проверьте совпадение кодов!', 'error');
+            } else {
+                showToast('Данные подтянуты', `Строк обработано: ${processedLinesCount}. Заполнено товаров: ${successCount}. Нажмите "Провести ведомость"!`, 'success');
+            }
         };
         reader.readAsText(file, 'UTF-8');
+        e.target.value = ''; 
     };
 
     async function performInventory() {
@@ -478,7 +611,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 banner.innerHTML = `<i class="fas fa-check-circle mr-2"></i>Инвентаризационная ведомость закрыта без отклонений.`;
             } else {
                 banner.className = "p-4 bg-rose-50 border-l-4 border-rose-500 rounded-xl text-rose-800 text-sm font-medium";
-                banner.innerHTML = `<i class="fas fa-exclamation-triangle mr-2"></i>Зафиксировано <strong>${deviations.length} отклонений</strong> in инвентаризационной ведомости.`;
+                banner.innerHTML = `<i class="fas fa-exclamation-triangle mr-2"></i>Зафиксировано <strong>${deviations.length} отклонений</strong> в инвентаризационной ведомости.`;
             }
             displayInventoryProtocol(deviations);
         }
@@ -615,9 +748,7 @@ document.addEventListener('DOMContentLoaded', function() {
         currentReportDataCache = [['Код товара', 'Наименование товара', 'Ед. изм.', 'Приход за период', 'Расход за период', 'Остаток расчетный', 'Факт', 'Дельта']];
 
         items.forEach(it => {
-            if (selectedItemCode !== 'all' && it.item_code !== selectedItemCode) {
-                return;
-            }
+            if (selectedItemCode !== 'all' && it.item_code !== selectedItemCode) return;
 
             const receiptsSum = getTotalReceipts(it.item_code, startDate, endDate); 
             const issuesSum = getTotalIssues(it.item_code, startDate, endDate);
@@ -666,12 +797,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const stockAtEndMap = getCalculatedStock(endDate ? endDate + "T23:59:59" : new Date().toISOString());
         const details = [];
 
-        currentReportDataCache = [['Код товара', 'Наименование товара', 'Запас на начало', 'Запас на конец', 'Средний запас', 'Расход (Списано)', 'Коэф. Оборачиваемости', 'Дней на складе']];
+        currentReportDataCache = [['Код товара', 'Наименование товара', 'Запас на начало', 'Запас на конец', 'Средний запас', 'Расход (Списано)', 'Коэф. Оборачиваемости']];
 
         items.forEach(it => {
-            if (selectedItemCode !== 'all' && it.item_code !== selectedItemCode) {
-                return;
-            }
+            if (selectedItemCode !== 'all' && it.item_code !== selectedItemCode) return;
 
             const startStock = stockAtStartMap.get(it.item_code) || 0;
             const endStock = stockAtEndMap.get(it.item_code) || 0;
@@ -685,10 +814,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 turnoverRatio = totalSpent;
             }
 
-            const daysInStorage = turnoverRatio > 0 ? parseFloat((30 / turnoverRatio).toFixed(1)) : '∞';
-
-            details.push({ code: it.item_code, name: it.name, startStock, endStock, averageStock, totalSpent, turnoverRatio, daysInStorage });
-            currentReportDataCache.push([it.item_code, it.name, startStock, endStock, averageStock, totalSpent, turnoverRatio, daysInStorage === '∞' ? 'Нет движения' : daysInStorage]);
+            details.push({ code: it.item_code, name: it.name, startStock, endStock, averageStock, totalSpent, turnoverRatio });
+            currentReportDataCache.push([it.item_code, it.name, startStock, endStock, averageStock, totalSpent, turnoverRatio]);
         });
 
         document.getElementById('reportContent').innerHTML = `
@@ -698,7 +825,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="scrollable-table border border-slate-100 rounded-xl">
                 <table>
                     <thead class="bg-slate-50">
-                        <tr><th>Код товара</th><th>Наименование товара</th><th>Запас на начало</th><th>Запас на конец</th><th>Средний запас</th><th>Расход (Списано)</th><th class="text-indigo-700">Коэф. Оборачиваемости</th><th>Дней на складе</th></tr>
+                        <tr><th>Код товара</th><th>Наименование товара</th><th>Запас на начало</th><th>Запас на конец</th><th>Средний запас</th><th>Расход (Списано)</th><th class="text-indigo-700">Коэф. Оборачиваемости</th></tr>
                     </thead>
                     <tbody>${details.map(d => `
                         <tr>
@@ -709,7 +836,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             <td class="font-mono bg-slate-50/50">${d.averageStock}</td>
                             <td class="font-mono text-rose-600 font-bold">${d.totalSpent}</td>
                             <td class="bg-indigo-50/40 font-black text-indigo-700">${d.turnoverRatio}</td>
-                            <td class="font-medium text-slate-600">${d.daysInStorage === '∞' ? '<span class="text-slate-300">нет движения</span>' : d.daysInStorage + ' дн.'}</td>
                         </tr>`).join('')}</tbody>
                 </table>
             </div>`;

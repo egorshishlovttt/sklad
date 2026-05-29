@@ -24,78 +24,50 @@ const initialData = {
     items: [
         { item_code: "Т001", name: "Деталь X1", uom: "шт" },
         { item_code: "Т002", name: "Деталь X2", uom: "шт" },
-        { item_code: "Т003", name: "Упаковка", uom: "кор" },
-        { item_code: "Т004", name: "Смазка", uom: "л" },
-        { item_code: "Т005", name: "Инструмент", uom: "шт" }
+        { item_code: "Т003", name: "Кабель питания", uom: "м" }
     ],
     receipts: [],
     issues: [],
-    stockExpected: [],
-    nextDocIdReceipt: 100,
-    nextDocIdIssue: 200
+    stockExpected: []
 };
 
 function readDB() {
     if (!fs.existsSync(DATA_FILE)) {
-        fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2));
-        return initialData;
+        fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2), 'utf8');
     }
-    try {
-        return JSON.parse(fs.readFileSync(DATA_FILE));
-    } catch (e) {
-        return initialData;
-    }
+    return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
 }
 
 function writeDB(data) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
 }
 
+// --- AUTH MIDDLEWARE ---
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-    if (!token) return res.status(401).json({ message: "Доступ запрещен" });
+    if (!token) return res.status(401).json({ message: "Токен отсутствует" });
 
     jwt.verify(token, SECRET_KEY, (err, user) => {
-        if (err) return res.status(403).json({ message: "Недействительный токен" });
+        if (err) return res.status(403).json({ message: "Невалидный токен" });
         req.user = user;
         next();
     });
 }
 
-// --- AUTH ---
-app.post('/api/auth/register', (req, res) => {
-    const { username, password, fullname, role } = req.body;
-    const db = readDB();
-    if (db.users.find(u => u.username === username)) {
-        return res.status(400).json({ message: "Логин уже занят" });
-    }
-    const newUser = {
-        id: Math.max(...db.users.map(u => u.id), 0) + 1,
-        username,
-        password: bcrypt.hashSync(password, 8),
-        fullname: fullname || username,
-        role: role || 'storekeeper'
-    };
-    db.users.push(newUser);
-    writeDB(db);
-    res.status(201).json({ message: "Успешная регистрация" });
-});
-
+// --- AUTH ENDPOINTS ---
 app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body;
     const db = readDB();
     const user = db.users.find(u => u.username === username);
-    if (!user) return res.status(404).json({ message: "Пользователь не найден" });
-
-    const valid = bcrypt.compareSync(password, user.password);
-    if (!valid) return res.status(401).json({ message: "Неверный пароль" });
-
-    const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, SECRET_KEY, { expiresIn: 86400 });
-    res.json({ token, user: { id: user.id, username: user.username, fullname: user.fullname, role: user.role } });
+    if (!user || !bcrypt.compareSync(password, user.password)) {
+        return res.status(400).json({ message: "Неверный логин или пароль" });
+    }
+    const token = jwt.sign({ id: user.id, username: user.username, role: user.role, fullname: user.fullname }, SECRET_KEY, { expiresIn: '24h' });
+    res.json({ token, user: { id: user.id, username: user.username, role: user.role, fullname: user.fullname } });
 });
 
-// --- ITEMS ---
+// --- ITEMS (NOMENCLATURE) ---
 app.get('/api/items', authenticateToken, (req, res) => {
     res.json(readDB().items);
 });
@@ -104,66 +76,98 @@ app.post('/api/items', authenticateToken, (req, res) => {
     if (req.user.role !== 'admin' && req.user.role !== 'manager') return res.status(403).json({ message: "Нет прав" });
     const { item_code, name, uom } = req.body;
     const db = readDB();
-    if (db.items.find(i => i.item_code === item_code)) return res.status(400).json({ message: "Код уже существует" });
+    if (db.items.find(i => i.item_code === item_code)) {
+        db.items = db.items.filter(i => i.item_code !== item_code);
+    }
     db.items.push({ item_code, name, uom });
     writeDB(db);
-    res.status(201).json({ message: "Товар добавлен" });
+    res.status(201).json({ message: "Сохранено" });
 });
 
 app.delete('/api/items/:code', authenticateToken, (req, res) => {
     if (req.user.role !== 'admin' && req.user.role !== 'manager') return res.status(403).json({ message: "Нет прав" });
-    const code = req.params.code;
     const db = readDB();
-    db.items = db.items.filter(i => i.item_code !== code);
-    db.receipts = db.receipts.filter(r => r.item_code !== code);
-    db.issues = db.issues.filter(i => i.item_code !== code);
-    db.stockExpected = db.stockExpected.filter(e => e.item_code !== code);
+    db.items = db.items.filter(i => i.item_code !== req.params.code);
     writeDB(db);
-    res.json({ message: "Товар удален" });
+    res.json({ message: "Удалено" });
 });
 
-// --- MOVEMENTS ---
-app.get('/api/receipts', authenticateToken, (req, res) => res.json(readDB().receipts));
-app.get('/api/issues', authenticateToken, (req, res) => res.json(readDB().issues));
+// --- RECEIPTS (ПРИХОД) ---
+app.get('/api/receipts', authenticateToken, (req, res) => {
+    res.json(readDB().receipts);
+});
 
 app.post('/api/receipts', authenticateToken, (req, res) => {
-    const { item_code, qty, date } = req.body;
+    const { item_code, qty, date, created_by } = req.body;
     const db = readDB();
-    const newDoc = { doc_id: db.nextDocIdReceipt++, item_code, qty, date };
+    const author = created_by || req.user.fullname || req.user.username || 'Система';
+    
+    const newDoc = {
+        doc_id: Math.max(...db.receipts.map(r => r.doc_id), 0) + 1,
+        item_code,
+        qty: parseFloat(qty),
+        date: date || new Date().toISOString().replace('T', ' ').slice(0, 19),
+        created_by: author
+    };
     db.receipts.push(newDoc);
     writeDB(db);
     res.status(201).json(newDoc);
 });
 
-app.post('/api/issues', authenticateToken, (req, res) => {
-    const { item_code, qty, date } = req.body;
+// Точный роут для удаления прихода
+app.delete('/api/receipts/:id', authenticateToken, (req, res) => {
     const db = readDB();
-    const rSum = db.receipts.filter(r => r.item_code === item_code && r.date <= date).reduce((a, b) => a + b.qty, 0);
-    const iSum = db.issues.filter(i => i.item_code === item_code && i.date <= date).reduce((a, b) => a + b.qty, 0);
-    if ((rSum - iSum) < qty) return res.status(400).json({ message: "Недостаточно остатка на складе" });
+    const initialLength = db.receipts.length;
+    db.receipts = db.receipts.filter(r => r.doc_id !== parseInt(req.params.id));
+    
+    if (db.receipts.length === initialLength) {
+        return res.status(444).json({ message: "Документ прихода не найден" });
+    }
+    
+    writeDB(db);
+    res.json({ message: "Аннулировано" });
+});
 
-    const newDoc = { doc_id: db.nextDocIdIssue++, item_code, qty, date };
+// --- ISSUES (РАСХОД) ---
+app.get('/api/issues', authenticateToken, (req, res) => {
+    res.json(readDB().issues);
+});
+
+app.post('/api/issues', authenticateToken, (req, res) => {
+    const { item_code, qty, date, created_by } = req.body;
+    const db = readDB();
+    const author = created_by || req.user.fullname || req.user.username || 'Система';
+
+    const newDoc = {
+        doc_id: Math.max(...db.issues.map(i => i.doc_id), 0) + 1,
+        item_code,
+        qty: parseFloat(qty),
+        date: date || new Date().toISOString().replace('T', ' ').slice(0, 19),
+        created_by: author
+    };
     db.issues.push(newDoc);
     writeDB(db);
     res.status(201).json(newDoc);
 });
 
-app.delete('/api/receipts/:id', authenticateToken, (req, res) => {
-    const db = readDB();
-    db.receipts = db.receipts.filter(r => r.doc_id !== parseInt(req.params.id));
-    writeDB(db);
-    res.json({ message: "Удалено" });
-});
-
+// Точный роут для удаления расхода
 app.delete('/api/issues/:id', authenticateToken, (req, res) => {
     const db = readDB();
+    const initialLength = db.issues.length;
     db.issues = db.issues.filter(i => i.doc_id !== parseInt(req.params.id));
+    
+    if (db.issues.length === initialLength) {
+        return res.status(444).json({ message: "Документ расхода не найден" });
+    }
+
     writeDB(db);
-    res.json({ message: "Удалено" });
+    res.json({ message: "Аннулировано" });
 });
 
 // --- INVENTORY ---
-app.get('/api/inventory/expected', authenticateToken, (req, res) => res.json(readDB().stockExpected));
+app.get('/api/inventory/expected', authenticateToken, (req, res) => {
+    res.json(readDB().stockExpected || []);
+});
 
 app.post('/api/inventory/perform', authenticateToken, (req, res) => {
     const { newExpected } = req.body;
@@ -204,4 +208,4 @@ app.delete('/api/admin/users/:id', authenticateToken, (req, res) => {
     res.json({ message: "Удален" });
 });
 
-app.listen(PORT, () => console.log(`API Server running on http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`Сервер запущен на порту ${PORT}`));
