@@ -32,14 +32,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function getLocalDateTimeString() {
-        const tzoffset = (new Date()).getTimezoneOffset() * 60000; 
-        const localISOTime = (new Date(Date.now() - tzoffset)).toISOString();
-        return localISOTime.slice(0, 19).replace('T', ' ');
+        return new Date().toISOString();
     }
 
     function formatDateTime(dateStr) {
         if (!dateStr) return '—';
-        return dateStr.replace('T', ' ');
+        return dateStr.replace('T', ' ').slice(0, 19);
     }
 
     function showToast(title, message, type = 'error') {
@@ -96,11 +94,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function getCalculatedStock(asOfDate = null) {
-        const targetDate = asOfDate || new Date().toISOString();
+        const targetTime = asOfDate ? new Date(asOfDate).getTime() : Date.now();
         const map = new Map();
-        receipts.forEach(r => { if(r.date <= targetDate) map.set(r.item_code, (map.get(r.item_code)||0) + r.qty); });
-        issues.forEach(i => { if(i.date <= targetDate) map.set(i.item_code, (map.get(i.item_code)||0) - i.qty); });
-        for(let [k,v] of map.entries()) if(v<0) map.set(k,0);
+        
+        receipts.forEach(r => { 
+            if(new Date(r.date).getTime() <= targetTime) {
+                map.set(r.item_code, (map.get(r.item_code) || 0) + parseFloat(r.qty));
+            }
+        });
+        issues.forEach(i => { 
+            if(new Date(i.date).getTime() <= targetTime) {
+                map.set(i.item_code, (map.get(i.item_code) || 0) - parseFloat(i.qty));
+            }
+        });
         return map;
     }
 
@@ -269,7 +275,7 @@ document.addEventListener('DOMContentLoaded', function() {
         container.innerHTML = `
             <div class="bg-white rounded-2xl shadow border border-slate-100 p-6">
                 <div class="flex justify-between items-center mb-5 flex-wrap gap-2">
-                    <h2 class="text-xl font-bold text-slate-800"><i class="fas fa-arrow-up text-orange-500 mr-2"></i>Документы расхода (Списание/Отгрузка)</h2>
+                    <h2 class="text-xl font-bold text-slate-800"><i class="fas fa-arrow-up text-orange-500 mr-2"></i>Документы расхода (Отгрузка)</h2>
                     <div class="flex gap-2">
                         <button id="importIssueCsvBtn" class="bg-amber-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-amber-700 transition"><i class="fas fa-file-import mr-1"></i> Импорт CSV</button>
                         <button id="openIssueModalBtn" class="bg-orange-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-orange-700 transition"><i class="fas fa-plus mr-1"></i>Оформить расход</button>
@@ -297,16 +303,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const reader = new FileReader();
         reader.onload = async function(evt) {
             const lines = evt.target.result.split('\n').map(l => l.replace('\r', '').trim()); 
-            let successCount = 0;
             const currentUserName = window.appState.currentUser.fullname || window.appState.currentUser.username;
-            const localTime = getLocalDateTimeString();
+            const stockMap = getCalculatedStock();
+            const tempSpentMap = new Map();
+            
+            let validRows = [];
+            let conflictingRows = [];
 
             for(let i = 0; i < lines.length; i++) {
                 const line = lines[i]; if(!line || i === 0) continue; 
-                
                 let sep = ',';
                 if ((line.match(/;/g) || []).length > (line.match(/,/g) || []).length) sep = ';';
-                
                 const cols = line.split(sep); 
                 if(cols.length >= 2) {
                     const item_code = cols[0].trim();
@@ -314,34 +321,88 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (sep === ';') rawQty = rawQty.replace(',', '.');
                     const qty = parseFloat(rawQty);
 
-                    if (tabName === 'issue') {
-                        const currentStockMap = getCalculatedStock();
-                        const maxAvailable = currentStockMap.get(item_code) || 0;
-                        if (qty > maxAvailable) {
-                            showToast('Пропущено при импорте', `Товар ${item_code}: недостаточно остатка (${maxAvailable})`, 'amber');
-                            continue;
-                        }
-                    }
+                    if (isNaN(qty) || qty <= 0 || !item_code) continue;
 
-                    if (item_code && !isNaN(qty) && qty > 0) {
-                        await apiRequest(endpoint, 'POST', { 
-                            item_code: item_code, 
-                            qty: qty,
-                            date: localTime, 
-                            created_by: currentUserName 
-                        });
-                        successCount++;
+                    if (tabName === 'issue') {
+                        const currentAvailable = stockMap.get(item_code) || 0;
+                        const alreadySpent = tempSpentMap.get(item_code) || 0;
+                        const finalAvailable = currentAvailable - alreadySpent;
+
+                        if (qty > finalAvailable) {
+                            const itemObj = items.find(it => it.item_code === item_code);
+                            const itemName = itemObj ? itemObj.name : 'Неизвестный товар';
+                            conflictingRows.push({
+                                line: i + 1,
+                                item_code,
+                                name: itemName,
+                                requested: qty,
+                                available: finalAvailable
+                            });
+                        } else {
+                            tempSpentMap.set(item_code, alreadySpent + qty);
+                            validRows.push({ item_code, qty });
+                        }
+                    } else {
+                        validRows.push({ item_code, qty });
                     }
                 }
             }
-            showToast('Импорт завершен', `Успешно проведено документов: ${successCount}`, 'success');
-            switchTab(tabName);
+
+            const uploadRows = async (rowsToUpload) => {
+                let successCount = 0;
+                for (const row of rowsToUpload) {
+                    const localTime = getLocalDateTimeString();
+                    await apiRequest(endpoint, 'POST', { 
+                        item_code: row.item_code, 
+                        qty: row.qty,
+                        date: localTime, 
+                        created_by: currentUserName 
+                    });
+                    successCount++;
+                }
+                if (successCount > 0) {
+                    showToast('Импорт завершен', `Успешно проведено документов: ${successCount}`, 'success');
+                }
+                switchTab(tabName);
+            };
+
+            if (tabName === 'issue' && conflictingRows.length > 0) {
+                const modal = document.getElementById('csvConflictModal');
+                const listContainer = document.getElementById('csvConflictList');
+                const cancelBtn = document.getElementById('csvCancelAllBtn');
+                const partialBtn = document.getElementById('csvProceedPartialBtn');
+
+                listContainer.innerHTML = conflictingRows.map(r => 
+                    `<div>Строка ${r.line}: ${r.item_code} "${r.name}" — затребовано ${r.requested}, в наличии ${r.available}</div>`
+                ).join('');
+
+                modal.classList.remove('hidden');
+
+                cancelBtn.onclick = () => {
+                    modal.classList.add('hidden');
+                    showToast('Импорт отменен', 'Операция полностью отклонена пользователем.', 'info');
+                };
+
+                partialBtn.onclick = async () => {
+                    modal.classList.add('hidden');
+                    if (validRows.length === 0) {
+                        showToast('Нечего проводить', 'Нет строк, количество которых удовлетворяет остаткам на складе.', 'error');
+                        return;
+                    }
+                    await uploadRows(validRows);
+                };
+            } else {
+                if (validRows.length > 0) {
+                    await uploadRows(validRows);
+                } else {
+                    showToast('Ошибка импорта', 'Файл не содержит корректных данных для загрузки.', 'error');
+                }
+            }
         };
         reader.readAsText(file, 'UTF-8');
         e.target.value = ''; 
     }
 
-    // Полностью восстановленная и исправленная функция удаления документов
     window.delDoc = async (type, id) => { 
         if(confirm('Аннулировать и удалить данный документ движения?')) { 
             const res = await apiRequest(`/${type}/${id}`, 'DELETE'); 
@@ -363,7 +424,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if(timeTimer) clearInterval(timeTimer);
         const updateLabel = () => {
             const lbl = document.getElementById('modalCurrentTimeLabel');
-            if(lbl) lbl.innerText = getLocalDateTimeString();
+            if(lbl) lbl.innerText = formatDateTime(getLocalDateTimeString());
         };
         updateLabel();
         timeTimer = setInterval(updateLabel, 1000);
@@ -418,7 +479,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-3 rounded-xl flex items-center gap-3 shadow-inner">
                         <div class="p-2.5 bg-blue-600 text-white rounded-lg"><i class="fas fa-bullseye text-xl"></i></div>
                         <div>
-                            <div class="text-[10px] font-black text-blue-500 tracking-wider uppercase">Точность склада (Accuracy)</div>
+                            <div class="text-[10px] font-black text-blue-500 tracking-wider uppercase">Точность склада</div>
                             <div class="text-xl font-black text-slate-800" id="accuracyWidgetValue">0.0%</div>
                         </div>
                     </div>
@@ -745,7 +806,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let totalReceiptQty = 0, totalIssueQty = 0, totalCalculated = 0; 
         const details = [];
 
-        currentReportDataCache = [['Код товара', 'Наименование товара', 'Ед. изм.', 'Приход за период', 'Расход за период', 'Остаток расчетный', 'Факт', 'Дельта']];
+        currentReportDataCache = [['Код товара', 'Наименование товара', 'Ед. изм.', 'Приход за период', 'Расход за период', 'Учетный остаток', 'Факт', 'Дельта']];
 
         items.forEach(it => {
             if (selectedItemCode !== 'all' && it.item_code !== selectedItemCode) return;
@@ -776,7 +837,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div class="scrollable-table border border-slate-100 rounded-xl">
                 <table>
-                    <thead class="bg-slate-50"><tr><th>Код товара</th><th>Наименование товара</th><th>Ед. изм.</th><th>Приход за период</th><th>Расход за период</th><th>Остаток на конец</th><th>Факт</th><th>Дельта</th></tr></thead>
+                    <thead class="bg-slate-50"><tr><th>Код товара</th><th>Наименование товара</th><th>Ед. изм.</th><th>Приход за период</th><th>Расход за период</th><th>Учетный остаток</th><th>Факт</th><th>Дельта</th></tr></thead>
                     <tbody>${details.map(d => `<tr><td class="font-bold">${d.code}</td><td>${d.name}</td><td>${d.uom}</td><td class="font-mono text-emerald-600">+${d.receiptsSum}</td><td class="font-mono text-rose-600">-${d.issuesSum}</td><td class="font-semibold">${d.calculatedStock}</td><td>${d.actualStock}</td><td class="${d.delta !== '—' && d.delta !== 0 ? 'text-rose-600 font-bold' : ''}">${d.delta}</td></tr>`).join('')}</tbody>
                 </table>
             </div>`;
