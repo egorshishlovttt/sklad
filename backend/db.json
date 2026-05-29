@@ -8,33 +8,7 @@
       "role": "admin"
     }
   ],
-  "items": [
-    {
-      "item_code": "Т001",
-      "name": "Деталь X1",
-      "uom": "шт"
-    },
-    {
-      "item_code": "Т002",
-      "name": "Деталь X2",
-      "uom": "шт"
-    },
-    {
-      "item_code": "Т003",
-      "name": "Упаковка",
-      "uom": "кор"
-    },
-    {
-      "item_code": "Т004",
-      "name": "Смазка",
-      "uom": "л"
-    },
-    {
-      "item_code": "Т005",
-      "name": "123",
-      "uom": "шт"
-    }
-  ],
+  "items": [],
   "receipts": [],
   "issues": [],
   "stockExpected": [
@@ -49,6 +23,11 @@
       "date": "2026-05-29"
     },
     {
+      "item_code": "Т006",
+      "qty_expected": 0,
+      "date": "2026-05-29"
+    },
+    {
       "item_code": "Т001",
       "qty_expected": 0,
       "date": "2026-05-29"
@@ -70,11 +49,6 @@
     },
     {
       "item_code": "Т005",
-      "qty_expected": 0,
-      "date": "2026-05-29"
-    },
-    {
-      "item_code": "Т006",
       "qty_expected": 0,
       "date": "2026-05-29"
     }

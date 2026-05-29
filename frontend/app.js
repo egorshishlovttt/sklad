@@ -275,7 +275,7 @@ document.addEventListener('DOMContentLoaded', function() {
         container.innerHTML = `
             <div class="bg-white rounded-2xl shadow border border-slate-100 p-6">
                 <div class="flex justify-between items-center mb-5 flex-wrap gap-2">
-                    <h2 class="text-xl font-bold text-slate-800"><i class="fas fa-arrow-up text-orange-500 mr-2"></i>Документы расхода (Списание/Отгрузка)</h2>
+                    <h2 class="text-xl font-bold text-slate-800"><i class="fas fa-arrow-up text-orange-500 mr-2"></i>Документы расхода (Отгрузка)</h2>
                     <div class="flex gap-2">
                         <button id="importIssueCsvBtn" class="bg-amber-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-amber-700 transition"><i class="fas fa-file-import mr-1"></i> Импорт CSV</button>
                         <button id="openIssueModalBtn" class="bg-orange-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-orange-700 transition"><i class="fas fa-plus mr-1"></i>Оформить расход</button>
@@ -479,7 +479,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-3 rounded-xl flex items-center gap-3 shadow-inner">
                         <div class="p-2.5 bg-blue-600 text-white rounded-lg"><i class="fas fa-bullseye text-xl"></i></div>
                         <div>
-                            <div class="text-[10px] font-black text-blue-500 tracking-wider uppercase">Точность склада (Accuracy)</div>
+                            <div class="text-[10px] font-black text-blue-500 tracking-wider uppercase">Точность склада</div>
                             <div class="text-xl font-black text-slate-800" id="accuracyWidgetValue">0.0%</div>
                         </div>
                     </div>
@@ -806,7 +806,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let totalReceiptQty = 0, totalIssueQty = 0, totalCalculated = 0; 
         const details = [];
 
-        currentReportDataCache = [['Код товара', 'Наименование товара', 'Ед. изм.', 'Приход за период', 'Расход за период', 'Остаток расчетный', 'Факт', 'Дельта']];
+        currentReportDataCache = [['Код товара', 'Наименование товара', 'Ед. изм.', 'Приход за период', 'Расход за период', 'Учетный остаток', 'Факт', 'Дельта']];
 
         items.forEach(it => {
             if (selectedItemCode !== 'all' && it.item_code !== selectedItemCode) return;
@@ -837,7 +837,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div class="scrollable-table border border-slate-100 rounded-xl">
                 <table>
-                    <thead class="bg-slate-50"><tr><th>Код товара</th><th>Наименование товара</th><th>Ед. изм.</th><th>Приход за период</th><th>Расход за период</th><th>Остаток на конец</th><th>Факт</th><th>Дельта</th></tr></thead>
+                    <thead class="bg-slate-50"><tr><th>Код товара</th><th>Наименование товара</th><th>Ед. изм.</th><th>Приход за период</th><th>Расход за период</th><th>Учетный остаток</th><th>Факт</th><th>Дельта</th></tr></thead>
                     <tbody>${details.map(d => `<tr><td class="font-bold">${d.code}</td><td>${d.name}</td><td>${d.uom}</td><td class="font-mono text-emerald-600">+${d.receiptsSum}</td><td class="font-mono text-rose-600">-${d.issuesSum}</td><td class="font-semibold">${d.calculatedStock}</td><td>${d.actualStock}</td><td class="${d.delta !== '—' && d.delta !== 0 ? 'text-rose-600 font-bold' : ''}">${d.delta}</td></tr>`).join('')}</tbody>
                 </table>
             </div>`;
