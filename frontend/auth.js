@@ -1,5 +1,3 @@
-const API_URL = 'http://localhost:5001/api';
-
 window.appState = {
     currentUser: null,
     activeTab: 'items'
