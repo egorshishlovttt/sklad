@@ -8,21 +8,21 @@ const ROLE_TABS = {
 };
 
 const TAB_NAMES = {
-    items: 'Номенклатура',
-    receipt: 'Приход',
-    issue: 'Расход',
-    stock: 'Остатки',
-    inventory: 'Инвентаризация',
-    reports: 'Отчеты',
-    admin: 'Администрирование'
+    items: '📦 Номенклатура',
+    receipt: '📥 Приход',
+    issue: '📤 Расход',
+    stock: '📊 Остатки',
+    inventory: '🔍 Инвентаризация',
+    reports: '📈 Отчеты',
+    admin: '👑 Администрирование'
 };
 
 const TAB_ICONS = {
-    items: 'fa-boxes',
-    receipt: 'fa-arrow-down',
-    issue: 'fa-arrow-up',
-    stock: 'fa-warehouse',
-    inventory: 'fa-clipboard-list',
-    reports: 'fa-chart-line',
-    admin: 'fa-user-shield'
+    items: '',
+    receipt: '',
+    issue: '',
+    stock: '',
+    inventory: '',
+    reports: '',
+    admin: ''
 };

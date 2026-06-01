@@ -22,9 +22,9 @@ function renderTabs() {
         btn.className = `px-5 py-2.5 text-sm font-semibold rounded-xl transition flex items-center gap-2 ${
             isActive 
                 ? 'bg-blue-600 text-white shadow-md' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                : 'bg-white text-gray-700 hover:bg-gray-300'
         }`;
-        btn.innerHTML = `<i class="fas ${TAB_ICONS[tabId]}"></i> ${TAB_NAMES[tabId]}`;
+        btn.innerHTML = `${TAB_NAMES[tabId]}`;
         btn.onclick = () => switchTab(tabId);
         container.appendChild(btn);
     });
